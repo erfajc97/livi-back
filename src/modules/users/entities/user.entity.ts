@@ -34,6 +34,24 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ default: false })
+  isEmailVerified: boolean;
+
+  @Column({ nullable: true, type: 'varchar' })
+  emailVerificationToken: string | null;
+
+  @Column({ nullable: true, type: 'timestamp' })
+  emailVerificationTokenExpiry: Date | null;
+
+  @Column({ nullable: true, type: 'varchar' })
+  passwordResetToken: string | null;
+
+  @Column({ nullable: true, type: 'timestamp' })
+  passwordResetTokenExpiry: Date | null;
+
+  @Column({ default: 'local', type: 'varchar' })
+  authProvider: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -11,6 +11,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -34,6 +35,17 @@ export class OrdersController {
   @ApiResponse({ status: 400, description: 'Bad request (invalid items, insufficient stock, etc.)' })
   create(@Body() createOrderDto: CreateOrderDto, @CurrentUser() user: User) {
     return this.ordersService.create(createOrderDto, user.id);
+  }
+
+  @Post('manual')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Create manual order (admin)',
+    description: 'Admin creates an order on behalf of a client with optional discount',
+  })
+  @ApiResponse({ status: 201, description: 'Manual order created', type: OrderResponseDto })
+  createManual(@Body() dto: CreateManualOrderDto) {
+    return this.ordersService.createManualOrder(dto);
   }
 
   @Post('from-cart')

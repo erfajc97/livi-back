@@ -4,6 +4,10 @@ import { Category } from '../../modules/categories/entities/category.entity';
 import { Subcategory } from '../../modules/categories/entities/subcategory.entity';
 import { Product } from '../../modules/products/entities/product.entity';
 import { ProductVariation } from '../../modules/products/entities/product-variation.entity';
+import { ComboProduct } from '../../modules/combos/entities/combo-product.entity';
+import { Combo } from '../../modules/combos/entities/combo.entity';
+import { OrderItem } from '../../modules/orders/entities/order-item.entity';
+import { Order } from '../../modules/orders/entities/order.entity';
 
 export class CategoriesSeeder extends BaseSeeder {
   async seed(dataSource: DataSource): Promise<void> {
@@ -13,7 +17,22 @@ export class CategoriesSeeder extends BaseSeeder {
     const variationRepository = dataSource.getRepository(ProductVariation);
 
     // Clear existing data (delete in reverse dependency order)
-    // First delete variations (they reference products)
+    // First clear tables that reference products
+    const comboProductRepo = dataSource.getRepository(ComboProduct);
+    const comboRepo = dataSource.getRepository(Combo);
+    const orderItemRepo = dataSource.getRepository(OrderItem);
+    const orderRepo = dataSource.getRepository(Order);
+
+    const orderItems = await orderItemRepo.find();
+    if (orderItems.length > 0) await orderItemRepo.remove(orderItems);
+    const orders = await orderRepo.find();
+    if (orders.length > 0) await orderRepo.remove(orders);
+    const comboProducts = await comboProductRepo.find();
+    if (comboProducts.length > 0) await comboProductRepo.remove(comboProducts);
+    const combos = await comboRepo.find();
+    if (combos.length > 0) await comboRepo.remove(combos);
+
+    // Delete variations (they reference products)
     const variations = await variationRepository.find();
     if (variations.length > 0) {
       await variationRepository.remove(variations);

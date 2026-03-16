@@ -27,6 +27,7 @@ export class UsersSeeder extends BaseSeeder {
       lastName: 'One',
       role: Role.ADMIN,
       isActive: true,
+      isEmailVerified: true,
     });
 
     const admin2 = await userRepository.save({
@@ -36,6 +37,7 @@ export class UsersSeeder extends BaseSeeder {
       lastName: 'Two',
       role: Role.ADMIN,
       isActive: true,
+      isEmailVerified: true,
     });
 
     // Create Client Users
@@ -101,6 +103,7 @@ export class UsersSeeder extends BaseSeeder {
           lastName: client.lastName,
           role: Role.CLIENT,
           isActive: true,
+          isEmailVerified: true,
         }),
       ),
     );

@@ -11,6 +11,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { Product } from '../products/entities/product.entity';
 import { ProductVariation } from '../products/entities/product-variation.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
 import { OrderStatus } from '../../common/constants/order-status.enum';
@@ -260,7 +261,7 @@ export class OrdersService {
 
     const orders = await this.ordersRepository.find({
       where,
-      relations: ['items'],
+      relations: ['items', 'user'],
       order: { createdAt: 'DESC' },
     });
 
@@ -395,5 +396,33 @@ export class OrdersService {
     }
 
     await this.ordersRepository.remove(order);
+  }
+
+  /**
+   * Create a manual order on behalf of a client (admin only)
+   */
+  async createManualOrder(dto: CreateManualOrderDto): Promise<OrderResponseDto> {
+    const orderDto: CreateOrderDto = {
+      items: dto.items,
+      paymentMethod: dto.paymentMethod,
+      notes: dto.notes ? `[Venta manual] ${dto.notes}` : '[Venta manual]',
+    };
+
+    const order = await this.create(orderDto, dto.userId);
+
+    // Apply discount if provided
+    if (dto.discountAmount && dto.discountAmount > 0) {
+      const savedOrder = await this.ordersRepository.findOne({
+        where: { id: order.id },
+        relations: ['items'],
+      });
+      if (savedOrder) {
+        savedOrder.total = Math.max(0, Number(savedOrder.total) - dto.discountAmount);
+        await this.ordersRepository.save(savedOrder);
+        return new OrderResponseDto(savedOrder);
+      }
+    }
+
+    return order;
   }
 }

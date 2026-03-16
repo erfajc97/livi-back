@@ -12,6 +12,9 @@ export class OrderResponseDto {
   @ApiProperty({ example: 1, description: 'User ID who placed the order' })
   userId: number;
 
+  @ApiPropertyOptional({ example: 'Juan Pérez', description: 'Client full name' })
+  userName?: string;
+
   @ApiProperty({ type: [OrderItemResponseDto], description: 'Order items' })
   items: OrderItemResponseDto[];
 
@@ -73,6 +76,9 @@ export class OrderResponseDto {
     this.id = order.id;
     this.orderNumber = order.orderNumber;
     this.userId = order.userId;
+    this.userName = order.user
+      ? `${order.user.firstName} ${order.user.lastName}`
+      : undefined;
     this.items = order.items ? order.items.map((item: any) => new OrderItemResponseDto(item)) : [];
     this.status = order.status;
     this.total = order.total;

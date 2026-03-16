@@ -289,7 +289,7 @@ export class ProductsSeeder extends BaseSeeder {
         price: productData.price,
       type: ProductType.PERFUME,
         description: productData.description,
-        imageUrl: `https://example.com/images/${productData.brand.toLowerCase().replace(/\s+/g, '-')}-${productData.name.toLowerCase().replace(/\s+/g, '-')}.jpg`,
+        imageUrl: `https://picsum.photos/seed/${productData.name.toLowerCase().replace(/\s+/g, '-')}/400/400`,
         stock: productData.stock,
         measureValue: productData.measureValue,
       measureUnit: MeasureUnit.ML,
