@@ -1,0 +1,1216 @@
+{
+  "api": {
+    "baseUrl": "http://localhost:3030/api",
+    "swaggerUrl": "http://localhost:3030/api/docs",
+    "authentication": {
+      "type": "Bearer Token (JWT)",
+      "header": "Authorization: Bearer <token>",
+      "loginEndpoint": "/auth/login"
+    },
+    "roles": {
+      "client": "Regular user who can browse and purchase products",
+      "admin": "Administrator with full access to manage products, categories, users, and orders"
+    }
+  },
+  "authentication": {
+    "login": {
+      "endpoint": "POST /auth/login",
+      "public": true,
+      "description": "Authenticate user and receive JWT token",
+      "request": {
+        "email": "user@example.com",
+        "password": "password123"
+      },
+      "response": {
+        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        "user": {
+          "id": 1,
+          "email": "user@example.com",
+          "firstName": "John",
+          "lastName": "Doe",
+          "role": "client"
+        }
+      },
+      "errors": {
+        "401": "Invalid credentials"
+      }
+    },
+    "register": {
+      "endpoint": "POST /users",
+      "public": true,
+      "description": "Register a new user account (no auth required)",
+      "request": {
+        "email": "newuser@example.com",
+        "password": "password123",
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "role": "client"
+      },
+      "response": {
+        "id": 2,
+        "email": "newuser@example.com",
+        "firstName": "Jane",
+        "lastName": "Smith",
+        "role": "client",
+        "isActive": true,
+        "createdAt": "2024-01-01T00:00:00.000Z",
+        "updatedAt": "2024-01-01T00:00:00.000Z"
+      },
+      "errors": {
+        "409": "User with this email already exists"
+      }
+    }
+  },
+  "clientFlows": {
+    "browseProducts": {
+      "description": "Client browsing and viewing products",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Get all categories",
+          "endpoint": "GET /categories",
+          "public": true,
+          "method": "GET",
+          "headers": {},
+          "queryParams": {
+            "page": 1,
+            "limit": 20
+          },
+          "response": "Paginated list of categories with subcategories"
+        },
+        {
+          "step": 2,
+          "action": "Get products with filters",
+          "endpoint": "GET /products",
+          "public": true,
+          "method": "GET",
+          "headers": {},
+          "queryParams": {
+            "page": 1,
+            "limit": 20,
+            "type": "perfume",
+            "categoryId": 1,
+            "subcategoryId": 1,
+            "brand": "Dior",
+            "search": "Sauvage",
+            "minPrice": 50,
+            "maxPrice": 200,
+            "isActive": true,
+            "measureUnit": "ml",
+            "sortBy": "name",
+            "sortOrder": "ASC"
+          },
+          "response": "Paginated list of products"
+        },
+        {
+          "step": 3,
+          "action": "Get single product details",
+          "endpoint": "GET /products/:id",
+          "public": true,
+          "method": "GET",
+          "headers": {},
+          "pathParams": {
+            "id": 1
+          },
+          "queryParams": {
+            "includeVariations": true
+          },
+          "response": "Product details with variations"
+        },
+        {
+          "step": 4,
+          "action": "Get product variations",
+          "endpoint": "GET /product-variations?productId=1",
+          "public": true,
+          "method": "GET",
+          "headers": {},
+          "queryParams": {
+            "productId": 1
+          },
+          "response": "List of product variations"
+        }
+      ]
+    },
+    "shoppingCartFlow": {
+      "description": "Complete shopping cart flow - adding items, updating, and clearing",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Get current cart",
+          "endpoint": "GET /cart",
+          "auth": true,
+          "method": "GET",
+          "headers": {
+            "Authorization": "Bearer <token>"
+          },
+          "response": {
+            "id": 1,
+            "userId": 1,
+            "items": [
+              {
+                "id": 1,
+                "productId": 1,
+                "productVariationId": null,
+                "quantity": 2,
+                "price": 120,
+                "subtotal": 240,
+                "productName": "Paco Rabanne",
+                "variationName": null
+              }
+            ],
+            "total": 240,
+            "itemCount": 2
+          }
+        },
+        {
+          "step": 2,
+          "action": "Add product to cart",
+          "endpoint": "POST /cart/items",
+          "auth": true,
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "productId": 1,
+            "quantity": 2
+          },
+          "alternativeBody": {
+            "productVariationId": 1,
+            "quantity": 1
+          },
+          "response": "Updated cart with new item",
+          "errors": {
+            "400": "Bad request (invalid item, insufficient stock)",
+            "404": "Product or variation not found"
+          }
+        },
+        {
+          "step": 3,
+          "action": "Update cart item quantity",
+          "endpoint": "PATCH /cart/items/:id",
+          "auth": true,
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "body": {
+            "quantity": 3
+          },
+          "response": "Updated cart",
+          "errors": {
+            "400": "Bad request (insufficient stock)",
+            "404": "Cart item not found"
+          }
+        },
+        {
+          "step": 4,
+          "action": "Remove item from cart",
+          "endpoint": "DELETE /cart/items/:id",
+          "auth": true,
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <token>"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "response": "Updated cart without removed item"
+        },
+        {
+          "step": 5,
+          "action": "Clear entire cart",
+          "endpoint": "DELETE /cart",
+          "auth": true,
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <token>"
+          },
+          "response": "Cart cleared successfully"
+        }
+      ]
+    },
+    "purchaseFlow": {
+      "description": "Complete purchase flow - creating orders from cart or direct items",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Create order from cart (recommended)",
+          "endpoint": "POST /orders/from-cart",
+          "auth": true,
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "paymentMethod": "Credit Card",
+            "shippingAddress": "123 Main St",
+            "shippingCity": "New York",
+            "shippingPostalCode": "10001",
+            "shippingCountry": "USA",
+            "notes": "Please handle with care"
+          },
+          "response": {
+            "id": 1,
+            "orderNumber": "ORD-2024-001234",
+            "userId": 1,
+            "items": [],
+            "status": "order_created",
+            "total": 360,
+            "paymentMethod": "Credit Card",
+            "paymentStatus": "pending",
+            "shippingAddress": "123 Main St",
+            "shippingCity": "New York",
+            "shippingPostalCode": "10001",
+            "shippingCountry": "USA"
+          },
+          "note": "Cart is automatically cleared after order creation",
+          "errors": {
+            "400": "Bad request (cart is empty, insufficient stock)"
+          }
+        },
+        {
+          "step": 2,
+          "action": "Create order with direct items (alternative)",
+          "endpoint": "POST /orders",
+          "auth": true,
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "items": [
+              {
+                "productId": 1,
+                "quantity": 2
+              },
+              {
+                "productVariationId": 1,
+                "quantity": 1
+              }
+            ],
+            "paymentMethod": "Credit Card",
+            "shippingAddress": "123 Main St",
+            "shippingCity": "New York",
+            "shippingPostalCode": "10001",
+            "shippingCountry": "USA",
+            "notes": "Please handle with care"
+          },
+          "response": "Order created with specified items",
+          "errors": {
+            "400": "Bad request (invalid items, insufficient stock)"
+          }
+        },
+        {
+          "step": 3,
+          "action": "View all my orders",
+          "endpoint": "GET /orders",
+          "auth": true,
+          "method": "GET",
+          "headers": {
+            "Authorization": "Bearer <token>"
+          },
+          "response": "List of user's orders",
+          "note": "Clients only see their own orders"
+        },
+        {
+          "step": 4,
+          "action": "View single order",
+          "endpoint": "GET /orders/:id",
+          "auth": true,
+          "method": "GET",
+          "headers": {
+            "Authorization": "Bearer <token>"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "response": "Order details",
+          "errors": {
+            "403": "Forbidden (trying to access another user's order)",
+            "404": "Order not found"
+          }
+        },
+        {
+          "step": 5,
+          "action": "Cancel my order",
+          "endpoint": "PATCH /orders/:id",
+          "auth": true,
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "body": {
+            "status": "order_cancelled"
+          },
+          "response": "Order cancelled",
+          "note": "Clients can only cancel their own orders",
+          "errors": {
+            "403": "Forbidden",
+            "404": "Order not found"
+          }
+        }
+      ]
+    },
+    "browseCategories": {
+      "description": "Browse categories and subcategories",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Get all categories",
+          "endpoint": "GET /categories",
+          "public": true,
+          "method": "GET",
+          "queryParams": {
+            "page": 1,
+            "limit": 20
+          }
+        },
+        {
+          "step": 2,
+          "action": "Get category details",
+          "endpoint": "GET /categories/:id",
+          "public": true,
+          "method": "GET",
+          "pathParams": {
+            "id": 1
+          }
+        },
+        {
+          "step": 3,
+          "action": "Get products in category",
+          "endpoint": "GET /categories/:id/products",
+          "public": true,
+          "method": "GET",
+          "pathParams": {
+            "id": 1
+          },
+          "queryParams": {
+            "page": 1,
+            "limit": 20
+          }
+        },
+        {
+          "step": 4,
+          "action": "Get subcategories of category",
+          "endpoint": "GET /categories/subcategories/category/:categoryId",
+          "public": true,
+          "method": "GET",
+          "pathParams": {
+            "categoryId": 1
+          },
+          "queryParams": {
+            "page": 1,
+            "limit": 20
+          }
+        },
+        {
+          "step": 5,
+          "action": "Get products in subcategory",
+          "endpoint": "GET /categories/subcategories/:id/products",
+          "public": true,
+          "method": "GET",
+          "pathParams": {
+            "id": 1
+          },
+          "queryParams": {
+            "page": 1,
+            "limit": 20
+          }
+        }
+      ]
+    }
+  },
+  "adminFlows": {
+    "productManagement": {
+      "description": "Complete product management flow - create, update, delete products",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Create a new product",
+          "endpoint": "POST /products",
+          "auth": true,
+          "role": "admin",
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Paco Rabanne",
+            "brand": "Paco Rabanne",
+            "price": 120,
+            "type": "perfume",
+            "description": "Iconic fragrance with fresh and woody notes",
+            "imageUrl": "https://example.com/product.jpg",
+            "stock": 50,
+            "measureValue": 100,
+            "measureUnit": "ml",
+            "categoryId": 1,
+            "subcategoryId": 1,
+            "isActive": true
+          },
+          "response": "Created product with ID",
+          "note": "parentProductId can be added to create a decant"
+        },
+        {
+          "step": 2,
+          "action": "Update product",
+          "endpoint": "PATCH /products/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "body": {
+            "price": 130,
+            "stock": 45,
+            "isActive": false
+          },
+          "response": "Updated product"
+        },
+        {
+          "step": 3,
+          "action": "Delete product",
+          "endpoint": "DELETE /products/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "response": "Product deleted",
+          "errors": {
+            "409": "Cannot delete product with existing decants"
+          }
+        }
+      ]
+    },
+    "productOptionsManagement": {
+      "description": "Manage product options and option values (e.g., Size, Color)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Create product option",
+          "endpoint": "POST /product-options",
+          "auth": true,
+          "role": "admin",
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Size",
+            "productType": "perfume"
+          }
+        },
+        {
+          "step": 2,
+          "action": "Create option value",
+          "endpoint": "POST /product-options/values",
+          "auth": true,
+          "role": "admin",
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "optionId": 1,
+            "value": "100ml"
+          }
+        },
+        {
+          "step": 3,
+          "action": "Get all options",
+          "endpoint": "GET /product-options",
+          "public": true,
+          "method": "GET",
+          "queryParams": {
+            "productType": "perfume"
+          }
+        },
+        {
+          "step": 4,
+          "action": "Update option",
+          "endpoint": "PATCH /product-options/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          }
+        },
+        {
+          "step": 5,
+          "action": "Delete option",
+          "endpoint": "DELETE /product-options/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "pathParams": {
+            "id": 1
+          }
+        }
+      ]
+    },
+    "productVariationsManagement": {
+      "description": "Manage product variations (combinations of option values)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Create product variation",
+          "endpoint": "POST /product-variations",
+          "auth": true,
+          "role": "admin",
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "productId": 1,
+            "optionValueIds": [1, 2],
+            "price": 120,
+            "stock": 50,
+            "sku": "PR-100ML-GREEN"
+          }
+        },
+        {
+          "step": 2,
+          "action": "Get all variations",
+          "endpoint": "GET /product-variations",
+          "public": true,
+          "method": "GET",
+          "queryParams": {
+            "productId": 1
+          }
+        },
+        {
+          "step": 3,
+          "action": "Update variation",
+          "endpoint": "PATCH /product-variations/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          }
+        },
+        {
+          "step": 4,
+          "action": "Delete variation",
+          "endpoint": "DELETE /product-variations/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "pathParams": {
+            "id": 1
+          }
+        }
+      ]
+    },
+    "categoryManagement": {
+      "description": "Manage categories and subcategories",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Create category",
+          "endpoint": "POST /categories",
+          "auth": true,
+          "role": "admin",
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Men's Fragrances",
+            "description": "Fragrances for men"
+          }
+        },
+        {
+          "step": 2,
+          "action": "Create subcategory",
+          "endpoint": "POST /categories/subcategories",
+          "auth": true,
+          "role": "admin",
+          "method": "POST",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "name": "Eau de Toilette",
+            "description": "Light fragrances",
+            "categoryId": 1
+          }
+        },
+        {
+          "step": 3,
+          "action": "Update category",
+          "endpoint": "PATCH /categories/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          }
+        },
+        {
+          "step": 4,
+          "action": "Delete category",
+          "endpoint": "DELETE /categories/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "pathParams": {
+            "id": 1
+          }
+        }
+      ]
+    },
+    "userManagement": {
+      "description": "Manage users - view, update, delete",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Get all users",
+          "endpoint": "GET /users",
+          "auth": true,
+          "role": "admin",
+          "method": "GET",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "response": "List of all users"
+        },
+        {
+          "step": 2,
+          "action": "Get user by ID",
+          "endpoint": "GET /users/:id",
+          "auth": true,
+          "method": "GET",
+          "headers": {
+            "Authorization": "Bearer <token>"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "response": "User details"
+        },
+        {
+          "step": 3,
+          "action": "Update user",
+          "endpoint": "PATCH /users/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "body": {
+            "firstName": "Updated Name",
+            "isActive": false
+          }
+        },
+        {
+          "step": 4,
+          "action": "Delete user",
+          "endpoint": "DELETE /users/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "pathParams": {
+            "id": 1
+          }
+        }
+      ]
+    },
+    "orderManagement": {
+      "description": "Admin order management - view all orders, update status, delete",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Get all orders (admin sees all, clients see only theirs)",
+          "endpoint": "GET /orders",
+          "auth": true,
+          "role": "admin",
+          "method": "GET",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "response": "List of all orders in system",
+          "note": "Admins see all orders, clients only see their own"
+        },
+        {
+          "step": 2,
+          "action": "Get order by ID",
+          "endpoint": "GET /orders/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "GET",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "response": "Order details",
+          "note": "Admins can access any order"
+        },
+        {
+          "step": 3,
+          "action": "Update order status",
+          "endpoint": "PATCH /orders/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "PATCH",
+          "headers": {
+            "Authorization": "Bearer <admin_token>",
+            "Content-Type": "application/json"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "body": {
+            "status": "order_accepted",
+            "paymentStatus": "paid",
+            "paymentReference": "PAY-123456",
+            "notes": "Order processed"
+          },
+          "availableStatuses": [
+            "order_created",
+            "order_received",
+            "order_accepted",
+            "order_rejected",
+            "order_shipped",
+            "order_delivered",
+            "order_delayed",
+            "order_cancelled"
+          ],
+          "response": "Updated order"
+        },
+        {
+          "step": 4,
+          "action": "Delete order (admin only)",
+          "endpoint": "DELETE /orders/:id",
+          "auth": true,
+          "role": "admin",
+          "method": "DELETE",
+          "headers": {
+            "Authorization": "Bearer <admin_token>"
+          },
+          "pathParams": {
+            "id": 1
+          },
+          "response": "Order deleted",
+          "errors": {
+            "403": "Forbidden (only admins can delete orders)"
+          }
+        }
+      ]
+    }
+  },
+  "endpoints": {
+    "public": [
+      {
+        "method": "POST",
+        "endpoint": "/auth/login",
+        "description": "User login"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/users",
+        "description": "Register new user"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/products",
+        "description": "Get products with filters"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/products/:id",
+        "description": "Get product by ID"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/products/with-decants",
+        "description": "Get all products with decants"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/products/:id/decants",
+        "description": "Get product decants"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/categories",
+        "description": "Get all categories"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/categories/:id",
+        "description": "Get category by ID"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/categories/:id/products",
+        "description": "Get products in category"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/categories/subcategories/all",
+        "description": "Get all subcategories"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/categories/subcategories/category/:categoryId",
+        "description": "Get subcategories by category"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/categories/subcategories/:id",
+        "description": "Get subcategory by ID"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/categories/subcategories/:id/products",
+        "description": "Get products in subcategory"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/product-options",
+        "description": "Get product options"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/product-options/:id",
+        "description": "Get product option by ID"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/product-options/values/all",
+        "description": "Get all option values"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/product-options/values/option/:optionId",
+        "description": "Get option values by option"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/product-options/values/:id",
+        "description": "Get option value by ID"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/product-variations",
+        "description": "Get product variations"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/product-variations/:id",
+        "description": "Get variation by ID"
+      }
+    ],
+    "client": [
+      {
+        "method": "GET",
+        "endpoint": "/cart",
+        "description": "Get current user's cart"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/cart/items",
+        "description": "Add item to cart"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/cart/items/:id",
+        "description": "Update cart item"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/cart/items/:id",
+        "description": "Remove item from cart"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/cart",
+        "description": "Clear cart"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/orders",
+        "description": "Create order"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/orders/from-cart",
+        "description": "Create order from cart"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/orders",
+        "description": "Get all my orders"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/orders/:id",
+        "description": "Get order by ID (own orders only)"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/orders/:id",
+        "description": "Update order (can cancel own orders)"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/users/:id",
+        "description": "Get user by ID"
+      }
+    ],
+    "admin": [
+      {
+        "method": "POST",
+        "endpoint": "/products",
+        "description": "Create product"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/products/:id",
+        "description": "Update product"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/products/:id",
+        "description": "Delete product"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/product-options",
+        "description": "Create product option"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/product-options/:id",
+        "description": "Update product option"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/product-options/:id",
+        "description": "Delete product option"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/product-options/values",
+        "description": "Create option value"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/product-options/values/:id",
+        "description": "Update option value"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/product-options/values/:id",
+        "description": "Delete option value"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/product-variations",
+        "description": "Create product variation"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/product-variations/:id",
+        "description": "Update product variation"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/product-variations/:id",
+        "description": "Delete product variation"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/categories",
+        "description": "Create category"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/categories/:id",
+        "description": "Update category"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/categories/:id",
+        "description": "Delete category"
+      },
+      {
+        "method": "POST",
+        "endpoint": "/categories/subcategories",
+        "description": "Create subcategory"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/categories/subcategories/:id",
+        "description": "Update subcategory"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/categories/subcategories/:id",
+        "description": "Delete subcategory"
+      },
+      {
+        "method": "GET",
+        "endpoint": "/users",
+        "description": "Get all users"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/users/:id",
+        "description": "Update user"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/users/:id",
+        "description": "Delete user"
+      },
+      {
+        "method": "PATCH",
+        "endpoint": "/orders/:id",
+        "description": "Update any order (admin)"
+      },
+      {
+        "method": "DELETE",
+        "endpoint": "/orders/:id",
+        "description": "Delete order (admin only)"
+      }
+    ]
+  },
+  "commonPatterns": {
+    "pagination": {
+      "queryParams": {
+        "page": "Page number (starts at 1, default: 1)",
+        "limit": "Items per page (default: 20, max: 100)"
+      },
+      "response": {
+        "data": "Array of items",
+        "total": "Total number of items",
+        "page": "Current page number",
+        "limit": "Items per page",
+        "totalPages": "Total number of pages",
+        "hasNext": "Whether there is a next page",
+        "hasPrev": "Whether there is a previous page"
+      }
+    },
+    "errorResponses": {
+      "400": "Bad Request - Invalid input data",
+      "401": "Unauthorized - Invalid or missing token",
+      "403": "Forbidden - Insufficient permissions",
+      "404": "Not Found - Resource doesn't exist",
+      "409": "Conflict - Resource conflict (e.g., duplicate email)"
+    },
+    "authentication": {
+      "header": "Authorization: Bearer <token>",
+      "tokenSource": "Login endpoint returns accessToken",
+      "tokenExpiration": "Check with backend team",
+      "refreshToken": "Not implemented - re-login required"
+    }
+  },
+  "orderStatuses": {
+    "order_created": "Order has been created",
+    "order_received": "Order has been received",
+    "order_accepted": "Order has been accepted",
+    "order_rejected": "Order has been rejected",
+    "order_shipped": "Order has been shipped",
+    "order_delivered": "Order has been delivered",
+    "order_delayed": "Order delivery is delayed",
+    "order_cancelled": "Order has been cancelled"
+  },
+  "exampleFlows": {
+    "completePurchaseFlow": {
+      "description": "End-to-end purchase flow from browsing to order completion",
+      "steps": [
+        "1. User registers or logs in",
+        "2. User browses categories and products",
+        "3. User views product details and variations",
+        "4. User adds products to cart",
+        "5. User views cart and updates quantities",
+        "6. User creates order from cart",
+        "7. User views order status",
+        "8. User can cancel order if needed"
+      ]
+    },
+    "adminProductSetup": {
+      "description": "Admin setting up a new product with variations",
+      "steps": [
+        "1. Create category and subcategory (if needed)",
+        "2. Create product options (e.g., Size, Color)",
+        "3. Create option values (e.g., 100ml, 200ml)",
+        "4. Create base product",
+        "5. Create product variations with option value combinations",
+        "6. Update stock and pricing as needed"
+      ]
+    }
+  },
+  "notes": {
+    "decants": "Decants are products that reference a parentProductId. They are child products of a main product.",
+    "variations": "Product variations are combinations of option values (e.g., Size: 100ml + Color: Green).",
+    "cart": "Cart is user-specific and automatically created on first item addition.",
+    "orders": "Orders can be created from cart (recommended) or with direct items. Cart is cleared when order is created from cart.",
+    "permissions": "All endpoints require authentication except public ones. Role-based access control applies to admin endpoints.",
+    "pagination": "Most list endpoints support pagination with page and limit query parameters.",
+    "filtering": "Product listing supports extensive filtering: type, category, subcategory, brand, search, price range, etc."
+  }
+}
