@@ -10,7 +10,7 @@ import {
 import { Category } from './category.entity';
 
 @Entity('subcategories')
-export class Subcategory {
+export class Marca {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
@@ -26,7 +26,16 @@ export class Subcategory {
   @Column({ default: true })
   isActive: boolean;
 
-  @ManyToOne(() => Category, (category) => category.subcategories)
+  @Column({ nullable: true })
+  imageUrl: string;
+
+  @Column({ nullable: true })
+  imageKey: string;
+
+  @Column({ default: false })
+  bajoPedido: boolean;
+
+  @ManyToOne(() => Category, (category) => category.marcas)
   @JoinColumn({ name: 'categoryId' })
   category: Category;
 

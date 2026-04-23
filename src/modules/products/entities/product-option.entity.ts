@@ -7,7 +7,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { ProductOptionValue } from './product-option-value.entity';
-import { ProductType } from './product.entity';
 
 @Entity('product_options')
 export class ProductOption {
@@ -22,7 +21,7 @@ export class ProductOption {
     length: 50,
     nullable: true,
   })
-  productType: ProductType | null; // null means available for all types
+  productType: string | null; // null means available for all types
 
   @Column({ nullable: true })
   description: string;

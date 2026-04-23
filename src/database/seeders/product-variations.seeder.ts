@@ -1,4 +1,4 @@
-import { DataSource, IsNull } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { BaseSeeder } from './base.seeder';
 import { Product } from '../../modules/products/entities/product.entity';
 import { ProductVariation } from '../../modules/products/entities/product-variation.entity';
@@ -40,10 +40,8 @@ export class ProductVariationsSeeder extends BaseSeeder {
       return;
     }
 
-    // Get all products (excluding decants)
-    const products = await productRepository.find({
-      where: { parentProductId: IsNull() },
-    });
+    // Get all products
+    const products = await productRepository.find();
 
     console.log(`Creating variations for ${products.length} products...`);
 
@@ -52,10 +50,9 @@ export class ProductVariationsSeeder extends BaseSeeder {
     const skuSet = new Set<string>();
 
     // Helper function to generate unique SKU
-    const generateUniqueSku = (brand: string, name: string, volume: string): string => {
-      const brandCode = brand.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
-      const nameCode = name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
-      let baseSku = `${brandCode}-${nameCode}-${volume}`;
+    const generateUniqueSku = (name: string, volume: string): string => {
+      const nameCode = name.substring(0, 6).toUpperCase().replace(/[^A-Z]/g, '');
+      let baseSku = `${nameCode}-${volume}`;
       let sku = baseSku;
       let counter = 1;
       
@@ -71,67 +68,55 @@ export class ProductVariationsSeeder extends BaseSeeder {
     // Create variations for each product
     for (const product of products) {
       const basePrice = Number(product.price);
-      const baseStock = product.stock;
+      const totalMl = Number(product.totalMl);
 
-      // Create 30ml variation (smaller, cheaper)
-      if (volume30ml) {
-        const price30ml = Math.round(basePrice * 0.4);
-        const stock30ml = Math.floor(baseStock * 0.3);
-        variationsToCreate.push({
-          productId: product.id,
-          price: price30ml,
-          stock: Math.max(stock30ml, 5), // Minimum 5 in stock
-          sku: generateUniqueSku(product.brand, product.name, '30ML'),
-          name: '30ml',
-          optionValues: [volume30ml],
-          isActive: true,
-        });
-      }
+      // Create 3ml decant variation
+      variationsToCreate.push({
+        productId: product.id,
+        price: Math.round(basePrice * 0.05),
+        mlSize: 3,
+        isFullBottle: false,
+        sku: generateUniqueSku(product.name, '3ML'),
+        name: '3ml Decant',
+        optionValues: [volume30ml],
+        isActive: true,
+      });
 
-      // Create 50ml variation (medium)
-      if (volume50ml) {
-        const price50ml = Math.round(basePrice * 0.65);
-        const stock50ml = Math.floor(baseStock * 0.4);
-        variationsToCreate.push({
-          productId: product.id,
-          price: price50ml,
-          stock: Math.max(stock50ml, 8), // Minimum 8 in stock
-          sku: generateUniqueSku(product.brand, product.name, '50ML'),
-          name: '50ml',
-          optionValues: [volume50ml],
-          isActive: true,
-        });
-      }
+      // Create 5ml decant variation
+      variationsToCreate.push({
+        productId: product.id,
+        price: Math.round(basePrice * 0.08),
+        mlSize: 5,
+        isFullBottle: false,
+        sku: generateUniqueSku(product.name, '5ML'),
+        name: '5ml Decant',
+        optionValues: [volume50ml],
+        isActive: true,
+      });
 
-      // Create 100ml variation (standard - matches base product)
-      if (volume100ml) {
-        const price100ml = basePrice;
-        const stock100ml = Math.floor(baseStock * 0.5);
-        variationsToCreate.push({
-          productId: product.id,
-          price: price100ml,
-          stock: Math.max(stock100ml, 10), // Minimum 10 in stock
-          sku: generateUniqueSku(product.brand, product.name, '100ML'),
-          name: '100ml',
-          optionValues: [volume100ml],
-          isActive: true,
-        });
-      }
+      // Create 10ml decant variation
+      variationsToCreate.push({
+        productId: product.id,
+        price: Math.round(basePrice * 0.15),
+        mlSize: 10,
+        isFullBottle: false,
+        sku: generateUniqueSku(product.name, '10ML'),
+        name: '10ml Decant',
+        optionValues: [volume100ml],
+        isActive: true,
+      });
 
-      // Create 200ml variation (larger, more expensive) - only for premium products
-      if (volume200ml && basePrice >= 150) {
-        const price200ml = Math.round(basePrice * 1.6);
-        const stock200ml = Math.floor(baseStock * 0.2);
-        variationsToCreate.push({
-          productId: product.id,
-          price: price200ml,
-          stock: Math.max(stock200ml, 3), // Minimum 3 in stock
-          sku: generateUniqueSku(product.brand, product.name, '200ML'),
-          name: '200ml',
-          optionValues: [volume200ml],
-          isActive: true,
-        });
-      }
+      // Create full bottle variation (matches product totalMl)
+      variationsToCreate.push({
+        productId: product.id,
+        price: basePrice,
+        mlSize: totalMl,
+        isFullBottle: true,
+        sku: generateUniqueSku(product.name, `${totalMl}ML-FULL`),
+        name: `${totalMl}ml Full Bottle`,
+        optionValues: [volume200ml],
+        isActive: true,
+      });
     }
 
     // Batch insert variations (in chunks to avoid memory issues)

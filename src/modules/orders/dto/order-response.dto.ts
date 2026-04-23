@@ -21,10 +21,40 @@ export class OrderResponseDto {
   @ApiProperty({ example: OrderStatus.CREATED, description: 'Order status', enum: OrderStatus })
   status: OrderStatus;
 
+  @ApiProperty({ description: 'Subtotal (items only)' })
+  subtotal: number;
+
+  @ApiProperty({ description: 'Delivery cost' })
+  deliveryCost: number;
+
+  @ApiProperty({ description: 'PayPhone surcharge (6%)' })
+  payphoneSurcharge: number;
+
+  @ApiProperty({ description: 'Coupon discount' })
+  couponDiscount: number;
+
   @ApiProperty({ example: 360.0, description: 'Total order amount' })
   total: number;
 
-  @ApiPropertyOptional({ example: 'Credit Card', description: 'Payment method' })
+  @ApiPropertyOptional({ description: 'Customer name' })
+  customerName?: string;
+
+  @ApiPropertyOptional({ description: 'Customer email' })
+  customerEmail?: string;
+
+  @ApiPropertyOptional({ description: 'Customer phone' })
+  customerPhone?: string;
+
+  @ApiPropertyOptional({ description: 'Delivery method' })
+  deliveryMethod?: string;
+
+  @ApiPropertyOptional({ description: 'Tracking code (Servientrega guide)' })
+  trackingCode?: string;
+
+  @ApiPropertyOptional({ description: 'Transfer receipt image URL' })
+  transferReceiptUrl?: string;
+
+  @ApiPropertyOptional({ example: 'PAYPHONE', description: 'Payment method' })
   paymentMethod?: string;
 
   @ApiPropertyOptional({ example: 'paid', description: 'Payment status' })
@@ -81,7 +111,17 @@ export class OrderResponseDto {
       : undefined;
     this.items = order.items ? order.items.map((item: any) => new OrderItemResponseDto(item)) : [];
     this.status = order.status;
-    this.total = order.total;
+    this.subtotal = Number(order.subtotal || 0);
+    this.deliveryCost = Number(order.deliveryCost || 0);
+    this.payphoneSurcharge = Number(order.payphoneSurcharge || 0);
+    this.couponDiscount = Number(order.couponDiscount || 0);
+    this.total = Number(order.total || 0);
+    this.customerName = order.customerName;
+    this.customerEmail = order.customerEmail;
+    this.customerPhone = order.customerPhone;
+    this.deliveryMethod = order.deliveryMethod;
+    this.trackingCode = order.trackingCode;
+    this.transferReceiptUrl = order.transferReceiptUrl;
     this.paymentMethod = order.paymentMethod;
     this.paymentStatus = order.paymentStatus;
     this.paymentReference = order.paymentReference;

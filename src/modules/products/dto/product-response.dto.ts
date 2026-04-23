@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProductType, MeasureUnit } from '../entities/product.entity';
+import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
 import { ProductVariationResponseDto } from './product-variation-response.dto';
 import { ProductImageResponseDto } from './product-image-response.dto';
 import { ProductVideoResponseDto } from './product-video-response.dto';
@@ -12,13 +12,7 @@ export class ProductResponseDto {
   name: string;
 
   @ApiProperty()
-  brand: string;
-
-  @ApiProperty()
   price: number;
-
-  @ApiProperty()
-  type: ProductType;
 
   @ApiProperty({ required: false })
   description?: string;
@@ -26,29 +20,53 @@ export class ProductResponseDto {
   @ApiProperty({ required: false })
   imageUrl?: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Sealed bottles in stock' })
   stock: number;
+
+  @ApiProperty({ description: 'Total ml per bottle' })
+  totalMl: number;
+
+  @ApiProperty({ description: 'Remaining ml in currently open bottle' })
+  openBottleMlRemaining: number;
+
+  @ApiProperty({ description: 'Total available ml (open bottle + sealed stock)' })
+  availableMl: number;
 
   @ApiProperty()
   isActive: boolean;
 
-  @ApiProperty({ required: false })
-  measureValue?: number;
+  @ApiProperty()
+  bajoPedido: boolean;
 
   @ApiProperty({ required: false })
-  measureUnit?: MeasureUnit;
+  gender?: Gender;
+
+  @ApiProperty({ required: false })
+  timeOfDay?: TimeOfDay;
+
+  @ApiProperty({ required: false })
+  concentration?: Concentration;
+
+  @ApiProperty({ required: false })
+  projection?: Projection;
+
+  @ApiProperty({ required: false })
+  discount?: number;
+
+  @ApiProperty({ required: false })
+  detailDescription?: string;
+
+  @ApiProperty({ required: false })
+  benefits?: string;
+
+  @ApiProperty()
+  salesCount: number;
 
   @ApiProperty()
   categoryId: number;
 
   @ApiProperty()
-  subcategoryId: number;
-
-  @ApiProperty({ required: false })
-  parentProductId?: number;
-
-  @ApiProperty({ type: [ProductResponseDto], required: false })
-  decants?: ProductResponseDto[];
+  marcaId: number;
 
   @ApiProperty({ type: [ProductVariationResponseDto], required: false })
   variations?: ProductVariationResponseDto[];
@@ -68,27 +86,33 @@ export class ProductResponseDto {
   constructor(product: any, includeVariations: boolean = false) {
     this.id = product.id;
     this.name = product.name;
-    this.brand = product.brand;
-    this.price = product.price;
-    this.type = product.type;
+    this.price = Number(product.price);
     this.description = product.description;
     this.imageUrl = product.imageUrl;
     this.stock = product.stock;
+    this.totalMl = Number(product.totalMl || 0);
+    this.openBottleMlRemaining = Number(product.openBottleMlRemaining || 0);
+    this.availableMl =
+      this.openBottleMlRemaining + this.stock * this.totalMl;
     this.isActive = product.isActive;
-    this.measureValue = product.measureValue;
-    this.measureUnit = product.measureUnit;
+    this.bajoPedido = product.bajoPedido;
+    this.gender = product.gender;
+    this.timeOfDay = product.timeOfDay;
+    this.concentration = product.concentration;
+    this.projection = product.projection;
+    this.discount = product.discount;
+    this.detailDescription = product.detailDescription;
+    this.benefits = product.benefits;
+    this.salesCount = product.salesCount ?? 0;
     this.categoryId = product.categoryId;
-    this.subcategoryId = product.subcategoryId;
-    this.parentProductId = product.parentProductId;
+    this.marcaId = product.marcaId;
     this.createdAt = product.createdAt;
     this.updatedAt = product.updatedAt;
 
-    if (product.decants && product.decants.length > 0) {
-      this.decants = product.decants.map((decant: any) => new ProductResponseDto(decant));
-    }
-
     if (includeVariations && product.variations && product.variations.length > 0) {
-      this.variations = product.variations.map((variation: any) => new ProductVariationResponseDto(variation));
+      this.variations = product.variations.map(
+        (variation: any) => new ProductVariationResponseDto(variation, this.stock, this.totalMl, this.openBottleMlRemaining),
+      );
     }
 
     if (product.images && product.images.length > 0) {

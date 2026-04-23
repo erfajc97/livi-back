@@ -19,7 +19,6 @@ export class CombosSeeder extends BaseSeeder {
 
     // Get some real products to use in combos
     const products = await productRepository.find({
-      where: { parentProductId: undefined },
       take: 12,
       order: { id: 'ASC' },
     });
@@ -35,7 +34,7 @@ export class CombosSeeder extends BaseSeeder {
         description: 'Perfecto para quienes buscan explorar nuevas fragancias. Incluye 3 decants de las marcas más populares.',
         imageUrl: 'https://picsum.photos/seed/combo-aventurero/400/400',
         finalPrice: 75.00,
-        sizeLabel: '5ml C/U',
+        discount: 25.00,
         isActive: true,
         productIds: [products[0].id, products[1].id, products[2].id],
       },
@@ -44,7 +43,7 @@ export class CombosSeeder extends BaseSeeder {
         description: 'Una selección curada de fragancias para descubrir tu aroma ideal. 4 decants premium a precio especial.',
         imageUrl: 'https://picsum.photos/seed/combo-descubrimiento/400/400',
         finalPrice: 65.00,
-        sizeLabel: '5ml C/U',
+        discount: 20.00,
         isActive: true,
         productIds: [products[3].id, products[4].id, products[5].id, products[6].id],
       },
@@ -53,7 +52,7 @@ export class CombosSeeder extends BaseSeeder {
         description: 'Las fragancias más exclusivas en un solo pack. Ideal como regalo o para coleccionistas.',
         imageUrl: 'https://picsum.photos/seed/combo-premium/400/400',
         finalPrice: 95.00,
-        sizeLabel: '10ml C/U',
+        discount: 30.00,
         isActive: true,
         productIds: [products[7].id, products[8].id, products[9].id],
       },

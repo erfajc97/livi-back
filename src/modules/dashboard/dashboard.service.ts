@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
 import { Order } from '../orders/entities/order.entity';
@@ -40,8 +40,8 @@ export class DashboardService {
       totalCombos,
       activeCombos,
     ] = await Promise.all([
-      this.productsRepository.count({ where: { parentProductId: IsNull() } }),
-      this.productsRepository.count({ where: { parentProductId: Not(IsNull()) } }),
+      this.productsRepository.count(),
+      this.productsRepository.createQueryBuilder('p').innerJoin('p.variations', 'v').getCount(),
       this.usersRepository.count(),
       this.usersRepository.count({ where: { role: Role.CLIENT } }),
       this.ordersRepository.count(),
@@ -56,7 +56,6 @@ export class DashboardService {
     const stockResult = await this.productsRepository
       .createQueryBuilder('product')
       .select('SUM(product.stock)', 'totalStock')
-      .where('product.parentProductId IS NULL')
       .getRawOne();
 
     const totalStock = parseInt(stockResult?.totalStock || '0', 10);
@@ -64,8 +63,7 @@ export class DashboardService {
     // Low stock products (stock < 10)
     const lowStockCount = await this.productsRepository
       .createQueryBuilder('product')
-      .where('product.parentProductId IS NULL')
-      .andWhere('product.stock < :threshold', { threshold: 10 })
+      .where('product.stock < :threshold', { threshold: 10 })
       .getCount();
 
     const maxStock = totalProducts * 400;

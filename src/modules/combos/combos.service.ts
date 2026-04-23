@@ -6,6 +6,7 @@ import { ComboProduct } from './entities/combo-product.entity';
 import { Product } from '../products/entities/product.entity';
 import { CreateComboDto } from './dto/create-combo.dto';
 import { UpdateComboDto } from './dto/update-combo.dto';
+import { S3Service } from '../../common/services/s3.service';
 
 @Injectable()
 export class CombosService {
@@ -16,9 +17,10 @@ export class CombosService {
     private comboProductRepository: Repository<ComboProduct>,
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
+    private s3Service: S3Service,
   ) {}
 
-  async create(dto: CreateComboDto): Promise<Combo> {
+  async create(dto: CreateComboDto, file?: Express.Multer.File): Promise<Combo> {
     // Validate all products exist
     for (const item of dto.products) {
       const product = await this.productRepository.findOneBy({ id: item.productId as any });
@@ -27,12 +29,22 @@ export class CombosService {
       }
     }
 
+    // Handle image upload
+    let imageUrl = dto.imageUrl;
+    let imageKey: string | undefined;
+    if (file) {
+      const uploaded = await this.s3Service.uploadFile(file, 'combos');
+      imageUrl = uploaded.url;
+      imageKey = uploaded.key;
+    }
+
     const combo = this.comboRepository.create({
       name: dto.name,
       description: dto.description,
-      imageUrl: dto.imageUrl,
+      imageUrl,
+      imageKey,
       finalPrice: dto.finalPrice,
-      sizeLabel: dto.sizeLabel,
+      discount: dto.discount ?? 0,
       isActive: dto.isActive ?? true,
     });
 
@@ -43,6 +55,7 @@ export class CombosService {
       this.comboProductRepository.create({
         comboId: savedCombo.id,
         productId: item.productId,
+        productVariationId: item.productVariationId,
         quantity: item.quantity ?? 1,
       }),
     );
@@ -53,7 +66,7 @@ export class CombosService {
 
   async findAll(): Promise<Combo[]> {
     return this.comboRepository.find({
-      relations: ['comboProducts', 'comboProducts.product'],
+      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.productVariation'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -61,7 +74,7 @@ export class CombosService {
   async findActive(): Promise<Combo[]> {
     return this.comboRepository.find({
       where: { isActive: true },
-      relations: ['comboProducts', 'comboProducts.product'],
+      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.productVariation'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -69,7 +82,7 @@ export class CombosService {
   async findOne(id: number): Promise<Combo> {
     const combo = await this.comboRepository.findOne({
       where: { id: id as any },
-      relations: ['comboProducts', 'comboProducts.product'],
+      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.productVariation'],
     });
     if (!combo) {
       throw new NotFoundException(`Combo with ID ${id} not found`);
@@ -77,16 +90,25 @@ export class CombosService {
     return combo;
   }
 
-  async update(id: number, dto: UpdateComboDto): Promise<Combo> {
+  async update(id: number, dto: UpdateComboDto, file?: Express.Multer.File): Promise<Combo> {
     const combo = await this.findOne(id);
 
     // Update basic fields
     if (dto.name !== undefined) combo.name = dto.name;
     if (dto.description !== undefined) combo.description = dto.description;
-    if (dto.imageUrl !== undefined) combo.imageUrl = dto.imageUrl;
     if (dto.finalPrice !== undefined) combo.finalPrice = dto.finalPrice;
-    if (dto.sizeLabel !== undefined) combo.sizeLabel = dto.sizeLabel;
+    if (dto.discount !== undefined) combo.discount = dto.discount;
     if (dto.isActive !== undefined) combo.isActive = dto.isActive;
+
+    // Handle image upload
+    if (file) {
+      if (combo.imageKey) {
+        await this.s3Service.deleteFile(combo.imageKey);
+      }
+      const uploaded = await this.s3Service.uploadFile(file, 'combos');
+      combo.imageUrl = uploaded.url;
+      combo.imageKey = uploaded.key;
+    }
 
     await this.comboRepository.save(combo);
 
@@ -108,6 +130,7 @@ export class CombosService {
         this.comboProductRepository.create({
           comboId: combo.id,
           productId: item.productId,
+          productVariationId: item.productVariationId,
           quantity: item.quantity ?? 1,
         }),
       );

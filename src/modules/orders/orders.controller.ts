@@ -100,7 +100,15 @@ export class OrdersController {
     @Body() updateOrderDto: UpdateOrderDto,
     @CurrentUser() user: User,
   ) {
-    return this.ordersService.update(+id, updateOrderDto, user.id, user.role);
+    return this.ordersService.update(+id, updateOrderDto, user.id, user.role, `${user.firstName} ${user.lastName}`);
+  }
+
+  @Get(':id/history')
+  @Roles(Role.CLIENT, Role.ADMIN)
+  @ApiOperation({ summary: 'Get order status history' })
+  @ApiParam({ name: 'id', type: 'number' })
+  getHistory(@Param('id') id: string) {
+    return this.ordersService.getStatusHistory(+id);
   }
 
   @Delete(':id')

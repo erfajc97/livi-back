@@ -28,7 +28,6 @@ export class OrdersSeeder extends BaseSeeder {
 
     // Get products (no parent = base products)
     const products = await productRepository.find({
-      where: { parentProductId: undefined },
       take: 20,
       order: { id: 'ASC' },
     });

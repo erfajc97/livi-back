@@ -25,13 +25,36 @@ export class OrderItemResponseDto {
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Last update date' })
   updatedAt: Date;
 
+  @ApiPropertyOptional({ description: 'Product name' })
+  productName?: string;
+
+  @ApiPropertyOptional({ description: 'Product image URL' })
+  productImage?: string;
+
+  @ApiPropertyOptional({ description: 'Variation ml size' })
+  mlSize?: number;
+
+  @ApiPropertyOptional({ description: 'Is full bottle' })
+  isFullBottle?: boolean;
+
   constructor(item: any) {
     this.id = item.id;
     this.productId = item.productId;
     this.productVariationId = item.productVariationId;
-    this.price = item.price;
+    this.price = Number(item.price);
     this.quantity = item.quantity;
-    this.subtotal = item.subtotal;
+    this.subtotal = Number(item.subtotal);
+
+    // Include product info if loaded
+    if (item.product) {
+      this.productName = item.product.name;
+      this.productImage = item.product.imageUrl;
+    }
+    if (item.productVariation) {
+      this.mlSize = Number(item.productVariation.mlSize);
+      this.isFullBottle = item.productVariation.isFullBottle;
+    }
+
     this.createdAt = item.createdAt;
     this.updatedAt = item.updatedAt;
   }

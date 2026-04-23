@@ -1,14 +1,13 @@
-import { IsString, IsNotEmpty, IsEnum, IsOptional, IsBoolean } from 'class-validator';
-import { ProductType } from '../entities/product.entity';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateProductOptionDto {
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @IsEnum(ProductType)
+  @IsString()
   @IsOptional()
-  productType?: ProductType | null;
+  productType?: string | null;
 
   @IsString()
   @IsOptional()

@@ -59,7 +59,8 @@ export class ProductVariationsService {
     const variation = this.variationsRepository.create({
       productId: createVariationDto.productId,
       price: createVariationDto.price,
-      stock: createVariationDto.stock ?? 0,
+      mlSize: createVariationDto.mlSize,
+      isFullBottle: createVariationDto.isFullBottle ?? false,
       sku: createVariationDto.sku,
       name: createVariationDto.name,
       isActive: createVariationDto.isActive ?? true,
@@ -76,7 +77,10 @@ export class ProductVariationsService {
       relations: ['product', 'optionValues', 'optionValues.option'],
     });
 
-    return variations.map((variation) => new ProductVariationResponseDto(variation));
+    return variations.map((variation) => {
+      const p = (variation as any).product;
+      return new ProductVariationResponseDto(variation, p?.stock, p?.totalMl, p?.openBottleMlRemaining);
+    });
   }
 
   async findByProduct(productId: number): Promise<ProductVariationResponseDto[]> {
@@ -86,7 +90,10 @@ export class ProductVariationsService {
       order: { createdAt: 'ASC' },
     });
 
-    return variations.map((variation) => new ProductVariationResponseDto(variation));
+    return variations.map((variation) => {
+      const p = (variation as any).product;
+      return new ProductVariationResponseDto(variation, p?.stock, p?.totalMl, p?.openBottleMlRemaining);
+    });
   }
 
   async findOne(id: number): Promise<ProductVariationResponseDto> {
@@ -99,7 +106,8 @@ export class ProductVariationsService {
       throw new NotFoundException(`Product variation with ID ${id} not found`);
     }
 
-    return new ProductVariationResponseDto(variation);
+    const p = (variation as any).product;
+    return new ProductVariationResponseDto(variation, p?.stock, p?.totalMl, p?.openBottleMlRemaining);
   }
 
   async update(
@@ -133,8 +141,11 @@ export class ProductVariationsService {
     if (updateVariationDto.price !== undefined) {
       variation.price = updateVariationDto.price;
     }
-    if (updateVariationDto.stock !== undefined) {
-      variation.stock = updateVariationDto.stock;
+    if (updateVariationDto.mlSize !== undefined) {
+      variation.mlSize = updateVariationDto.mlSize;
+    }
+    if (updateVariationDto.isFullBottle !== undefined) {
+      variation.isFullBottle = updateVariationDto.isFullBottle;
     }
     if (updateVariationDto.sku !== undefined) {
       variation.sku = updateVariationDto.sku;

@@ -8,8 +8,10 @@ import { ProductVariationsSeeder } from './product-variations.seeder';
 import { UsersSeeder } from './users.seeder';
 import { BannersSeeder } from './banners.seeder';
 import { CombosSeeder } from './combos.seeder';
-import { OrdersSeeder } from './orders.seeder';
+// import { OrdersSeeder } from './orders.seeder'; // Disabled — orders are now real
 import { FinanceSeeder } from './finance.seeder';
+import { ProductFilterFieldsSeeder } from './product-filter-fields.seeder';
+import { ProductImagesSeeder } from './product-images.seeder';
 import { entities } from '../../config/entities';
 
 // Reload environment variables to ensure fresh credentials
@@ -22,9 +24,11 @@ export const seeders = [
   ProductsSeeder,
   DecantsSeeder,
   ProductVariationsSeeder,
+  ProductFilterFieldsSeeder,
+  ProductImagesSeeder,
   BannersSeeder,
   CombosSeeder,
-  OrdersSeeder,
+  // OrdersSeeder,
   FinanceSeeder,
 ];
 

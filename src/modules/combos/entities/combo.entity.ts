@@ -22,11 +22,14 @@ export class Combo {
   @Column({ nullable: true })
   imageUrl: string;
 
+  @Column({ nullable: true })
+  imageKey: string;
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   finalPrice: number;
 
-  @Column({ nullable: true })
-  sizeLabel: string; // e.g. "5ml C/U", "10ml C/U"
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  discount: number;
 
   @Column({ default: true })
   isActive: boolean;

@@ -8,7 +8,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Subcategory } from './subcategory.entity';
+import { Marca } from './marca.entity';
 
 @Entity('categories')
 export class Category {
@@ -24,8 +24,17 @@ export class Category {
   @Column({ nullable: true })
   slug: string;
 
+  @Column({ nullable: true })
+  imageUrl: string;
+
+  @Column({ nullable: true })
+  imageKey: string;
+
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ default: false })
+  bajoPedido: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -33,6 +42,6 @@ export class Category {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => Subcategory, (subcategory) => subcategory.category)
-  subcategories: Subcategory[];
+  @OneToMany(() => Marca, (marca) => marca.category)
+  marcas: Marca[];
 }

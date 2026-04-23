@@ -49,6 +49,28 @@ export class User {
   @Column({ nullable: true, type: 'timestamp' })
   passwordResetTokenExpiry: Date | null;
 
+  // Contact / shipping preferences
+  @Column({ nullable: true })
+  phone: string;
+
+  @Column({ nullable: true })
+  cedula: string;
+
+  @Column({ nullable: true })
+  province: string;
+
+  @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  address: string;
+
+  @Column({ nullable: true })
+  reference: string;
+
+  @Column({ nullable: true })
+  preferredDeliveryMethod: string;
+
   @Column({ default: 'local', type: 'varchar' })
   authProvider: string;
 

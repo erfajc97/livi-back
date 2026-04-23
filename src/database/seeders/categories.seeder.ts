@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm';
 import { BaseSeeder } from './base.seeder';
 import { Category } from '../../modules/categories/entities/category.entity';
-import { Subcategory } from '../../modules/categories/entities/subcategory.entity';
+import { Marca } from '../../modules/categories/entities/marca.entity';
 import { Product } from '../../modules/products/entities/product.entity';
 import { ProductVariation } from '../../modules/products/entities/product-variation.entity';
 import { ComboProduct } from '../../modules/combos/entities/combo-product.entity';
@@ -12,7 +12,7 @@ import { Order } from '../../modules/orders/entities/order.entity';
 export class CategoriesSeeder extends BaseSeeder {
   async seed(dataSource: DataSource): Promise<void> {
     const categoryRepository = dataSource.getRepository(Category);
-    const subcategoryRepository = dataSource.getRepository(Subcategory);
+    const marcaRepository = dataSource.getRepository(Marca);
     const productRepository = dataSource.getRepository(Product);
     const variationRepository = dataSource.getRepository(ProductVariation);
 
@@ -37,15 +37,15 @@ export class CategoriesSeeder extends BaseSeeder {
     if (variations.length > 0) {
       await variationRepository.remove(variations);
     }
-    // Then delete products (they reference subcategories)
+    // Then delete products (they reference marcas)
     const products = await productRepository.find();
     if (products.length > 0) {
       await productRepository.remove(products);
     }
-    // Then delete subcategories (they reference categories)
-    const subcategories = await subcategoryRepository.find();
-    if (subcategories.length > 0) {
-      await subcategoryRepository.remove(subcategories);
+    // Then delete marcas (they reference categories)
+    const marcas = await marcaRepository.find();
+    if (marcas.length > 0) {
+      await marcaRepository.remove(marcas);
     }
     // Finally delete categories
     const categories = await categoryRepository.find();
@@ -53,11 +53,21 @@ export class CategoriesSeeder extends BaseSeeder {
       await categoryRepository.remove(categories);
     }
 
+    // Create "All" category — always first, always active, no marcas
+    await categoryRepository.save({
+      name: 'all',
+      slug: 'all',
+      description: 'Todos los productos disponibles',
+      imageUrl: 'https://picsum.photos/seed/all-products/1200/400',
+      isActive: true,
+    });
+
     // Create Perfume Categories
     const mensPerfumeCategory = await categoryRepository.save({
       name: "Men's Fragrances",
       slug: 'mens-fragrances',
       description: 'Premium men\'s perfumes and colognes',
+      imageUrl: 'https://picsum.photos/seed/mens-fragrance/1200/400',
       isActive: true,
     });
 
@@ -65,6 +75,7 @@ export class CategoriesSeeder extends BaseSeeder {
       name: "Women's Fragrances",
       slug: 'womens-fragrances',
       description: 'Elegant women\'s perfumes and fragrances',
+      imageUrl: 'https://picsum.photos/seed/womens-fragrance/1200/400',
       isActive: true,
     });
 
@@ -72,6 +83,7 @@ export class CategoriesSeeder extends BaseSeeder {
       name: 'Unisex Fragrances',
       slug: 'unisex-fragrances',
       description: 'Versatile fragrances for everyone',
+      imageUrl: 'https://picsum.photos/seed/unisex-fragrance/1200/400',
       isActive: true,
     });
 
@@ -79,6 +91,7 @@ export class CategoriesSeeder extends BaseSeeder {
       name: 'Niche Fragrances',
       slug: 'niche-fragrances',
       description: 'Exclusive and unique niche perfumes',
+      imageUrl: 'https://picsum.photos/seed/niche-fragrance/1200/400',
       isActive: true,
     });
 
@@ -86,15 +99,17 @@ export class CategoriesSeeder extends BaseSeeder {
       name: 'Designer Fragrances',
       slug: 'designer-fragrances',
       description: 'Luxury designer perfumes from top fashion houses',
+      imageUrl: 'https://picsum.photos/seed/designer-fragrance/1200/400',
       isActive: true,
     });
 
-    // Create Subcategories for Men's Fragrances
-    const mensSubcategories = await subcategoryRepository.save([
+    // Create Marcas for Men's Fragrances
+    const mensMarcas = await marcaRepository.save([
       {
         name: 'Fresh & Citrus',
         slug: 'mens-fresh-citrus',
         description: 'Light, fresh, and invigorating citrus scents',
+        imageUrl: 'https://picsum.photos/seed/fresh-citrus/1200/400',
         categoryId: mensPerfumeCategory.id,
         isActive: true,
       },
@@ -102,6 +117,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Woody & Spicy',
         slug: 'mens-woody-spicy',
         description: 'Rich woody and spicy fragrances',
+        imageUrl: 'https://picsum.photos/seed/woody-spicy/1200/400',
         categoryId: mensPerfumeCategory.id,
         isActive: true,
       },
@@ -109,6 +125,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Aquatic & Marine',
         slug: 'mens-aquatic-marine',
         description: 'Fresh aquatic and marine-inspired scents',
+        imageUrl: 'https://picsum.photos/seed/aquatic-marine/1200/400',
         categoryId: mensPerfumeCategory.id,
         isActive: true,
       },
@@ -116,6 +133,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Oriental & Amber',
         slug: 'mens-oriental-amber',
         description: 'Warm oriental and amber fragrances',
+        imageUrl: 'https://picsum.photos/seed/oriental-amber/1200/400',
         categoryId: mensPerfumeCategory.id,
         isActive: true,
       },
@@ -123,17 +141,19 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Fougère & Aromatic',
         slug: 'mens-fougere-aromatic',
         description: 'Classic fougère and aromatic compositions',
+        imageUrl: 'https://picsum.photos/seed/fougere-aromatic/1200/400',
         categoryId: mensPerfumeCategory.id,
         isActive: true,
       },
     ]);
 
-    // Create Subcategories for Women's Fragrances
-    const womensSubcategories = await subcategoryRepository.save([
+    // Create Marcas for Women's Fragrances
+    const womensMarcas = await marcaRepository.save([
       {
         name: 'Floral',
         slug: 'womens-floral',
         description: 'Delicate and romantic floral scents',
+        imageUrl: 'https://picsum.photos/seed/floral-perfume/1200/400',
         categoryId: womensPerfumeCategory.id,
         isActive: true,
       },
@@ -141,6 +161,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Fruity & Sweet',
         slug: 'womens-fruity-sweet',
         description: 'Playful fruity and sweet fragrances',
+        imageUrl: 'https://picsum.photos/seed/fruity-sweet/1200/400',
         categoryId: womensPerfumeCategory.id,
         isActive: true,
       },
@@ -148,6 +169,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Oriental & Spicy',
         slug: 'womens-oriental-spicy',
         description: 'Exotic oriental and spicy compositions',
+        imageUrl: 'https://picsum.photos/seed/oriental-spicy/1200/400',
         categoryId: womensPerfumeCategory.id,
         isActive: true,
       },
@@ -155,6 +177,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Fresh & Green',
         slug: 'womens-fresh-green',
         description: 'Crisp fresh and green fragrances',
+        imageUrl: 'https://picsum.photos/seed/fresh-green/1200/400',
         categoryId: womensPerfumeCategory.id,
         isActive: true,
       },
@@ -162,17 +185,19 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Chypre & Woody',
         slug: 'womens-chypre-woody',
         description: 'Sophisticated chypre and woody scents',
+        imageUrl: 'https://picsum.photos/seed/chypre-woody/1200/400',
         categoryId: womensPerfumeCategory.id,
         isActive: true,
       },
     ]);
 
-    // Create Subcategories for Unisex Fragrances
-    const unisexSubcategories = await subcategoryRepository.save([
+    // Create Marcas for Unisex Fragrances
+    const unisexMarcas = await marcaRepository.save([
       {
         name: 'Fresh & Clean',
         slug: 'unisex-fresh-clean',
         description: 'Clean and fresh unisex scents',
+        imageUrl: 'https://picsum.photos/seed/fresh-clean/1200/400',
         categoryId: unisexPerfumeCategory.id,
         isActive: true,
       },
@@ -180,6 +205,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Woody & Earthy',
         slug: 'unisex-woody-earthy',
         description: 'Natural woody and earthy fragrances',
+        imageUrl: 'https://picsum.photos/seed/woody-earthy/1200/400',
         categoryId: unisexPerfumeCategory.id,
         isActive: true,
       },
@@ -187,17 +213,19 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Aromatic & Herbal',
         slug: 'unisex-aromatic-herbal',
         description: 'Herbal and aromatic compositions',
+        imageUrl: 'https://picsum.photos/seed/aromatic-herbal/1200/400',
         categoryId: unisexPerfumeCategory.id,
         isActive: true,
       },
     ]);
 
-    // Create Subcategories for Niche Fragrances
-    const nicheSubcategories = await subcategoryRepository.save([
+    // Create Marcas for Niche Fragrances
+    const nicheMarcas = await marcaRepository.save([
       {
         name: 'Artisan & Boutique',
         slug: 'niche-artisan-boutique',
         description: 'Handcrafted artisan and boutique perfumes',
+        imageUrl: 'https://picsum.photos/seed/artisan-boutique/1200/400',
         categoryId: nichePerfumeCategory.id,
         isActive: true,
       },
@@ -205,6 +233,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Conceptual & Avant-Garde',
         slug: 'niche-conceptual-avant-garde',
         description: 'Unique conceptual and avant-garde scents',
+        imageUrl: 'https://picsum.photos/seed/conceptual-avantgarde/1200/400',
         categoryId: nichePerfumeCategory.id,
         isActive: true,
       },
@@ -212,17 +241,19 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Natural & Organic',
         slug: 'niche-natural-organic',
         description: 'Natural and organic niche fragrances',
+        imageUrl: 'https://picsum.photos/seed/natural-organic/1200/400',
         categoryId: nichePerfumeCategory.id,
         isActive: true,
       },
     ]);
 
-    // Create Subcategories for Designer Fragrances
-    const designerSubcategories = await subcategoryRepository.save([
+    // Create Marcas for Designer Fragrances
+    const designerMarcas = await marcaRepository.save([
       {
         name: 'Luxury Designer',
         slug: 'designer-luxury',
         description: 'Premium luxury designer fragrances',
+        imageUrl: 'https://picsum.photos/seed/luxury-designer/1200/400',
         categoryId: designerPerfumeCategory.id,
         isActive: true,
       },
@@ -230,6 +261,7 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Celebrity Fragrances',
         slug: 'designer-celebrity',
         description: 'Celebrity-endorsed designer perfumes',
+        imageUrl: 'https://picsum.photos/seed/celebrity-fragrance/1200/400',
         categoryId: designerPerfumeCategory.id,
         isActive: true,
       },
@@ -237,13 +269,14 @@ export class CategoriesSeeder extends BaseSeeder {
         name: 'Classic Designer',
         slug: 'designer-classic',
         description: 'Timeless classic designer fragrances',
+        imageUrl: 'https://picsum.photos/seed/classic-designer/1200/400',
         categoryId: designerPerfumeCategory.id,
         isActive: true,
       },
     ]);
 
-    console.log('✓ Categories and subcategories seeded');
+    console.log('✓ Categories and marcas seeded');
     console.log(`  - Created ${await categoryRepository.count()} categories`);
-    console.log(`  - Created ${await subcategoryRepository.count()} subcategories`);
+    console.log(`  - Created ${await marcaRepository.count()} marcas`);
   }
 }

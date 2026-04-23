@@ -14,6 +14,12 @@ import { BannersModule } from './modules/banners/banners.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CombosModule } from './modules/combos/combos.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { BlogModule } from './modules/blog/blog.module';
+import { CouponsModule } from './modules/coupons/coupons.module';
+import { ProductTypesModule } from './modules/product-types/product-types.module';
+import { LandingSectionsModule } from './modules/landing-sections/landing-sections.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { SettingsModule } from './modules/settings/settings.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -40,6 +46,12 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     DashboardModule,
     CombosModule,
     FinanceModule,
+    BlogModule,
+    CouponsModule,
+    ProductTypesModule,
+    LandingSectionsModule,
+    PaymentsModule,
+    SettingsModule,
   ],
   providers: [
     {

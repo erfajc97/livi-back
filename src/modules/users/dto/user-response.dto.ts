@@ -20,6 +20,33 @@ export class UserResponseDto {
   @ApiProperty({ example: true, description: 'User active status' })
   isActive: boolean;
 
+  @ApiProperty({ required: false })
+  isEmailVerified: boolean;
+
+  @ApiProperty({ required: false })
+  phone?: string;
+
+  @ApiProperty({ required: false })
+  cedula?: string;
+
+  @ApiProperty({ required: false })
+  province?: string;
+
+  @ApiProperty({ required: false })
+  city?: string;
+
+  @ApiProperty({ required: false })
+  address?: string;
+
+  @ApiProperty({ required: false })
+  reference?: string;
+
+  @ApiProperty({ required: false })
+  preferredDeliveryMethod?: string;
+
+  @ApiProperty({ description: 'Auth provider (local, google)' })
+  authProvider: string;
+
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z', description: 'Creation date' })
   createdAt: Date;
 
@@ -33,6 +60,15 @@ export class UserResponseDto {
     this.lastName = user.lastName;
     this.role = user.role;
     this.isActive = user.isActive;
+    this.isEmailVerified = user.isEmailVerified ?? false;
+    this.phone = user.phone;
+    this.cedula = user.cedula;
+    this.province = user.province;
+    this.city = user.city;
+    this.address = user.address;
+    this.reference = user.reference;
+    this.preferredDeliveryMethod = user.preferredDeliveryMethod;
+    this.authProvider = user.authProvider ?? 'local';
     this.createdAt = user.createdAt;
     this.updatedAt = user.updatedAt;
   }

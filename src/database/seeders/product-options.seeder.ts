@@ -2,7 +2,6 @@ import { DataSource } from 'typeorm';
 import { BaseSeeder } from './base.seeder';
 import { ProductOption } from '../../modules/products/entities/product-option.entity';
 import { ProductOptionValue } from '../../modules/products/entities/product-option-value.entity';
-import { ProductType } from '../../modules/products/entities/product.entity';
 
 export class ProductOptionsSeeder extends BaseSeeder {
   async seed(dataSource: DataSource): Promise<void> {
@@ -61,7 +60,7 @@ export class ProductOptionsSeeder extends BaseSeeder {
     // Create Volume Option (for perfumes)
     const volumeOption = await optionRepository.save({
       name: 'Volume',
-      productType: ProductType.PERFUME,
+      productType: 'perfume',
       description: 'Perfume bottle volume',
       isActive: true,
     });

@@ -55,6 +55,14 @@ export class OrderItem {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   subtotal: number;
 
+  // Total ml deducted from open bottle (for decant orders, used in cancellation restoration)
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  mlDeducted: number;
+
+  // Number of sealed bottles opened to fulfill this order item
+  @Column({ default: 0 })
+  bottlesOpened: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -47,19 +47,11 @@ export class ProductsController {
     return this.productsService.findWithFilters(filterDto);
   }
 
-  @Get('with-decants')
-  @Public()
-  @ApiOperation({ summary: 'Get all products with decants', description: 'Retrieve products including their decants' })
-  @ApiResponse({ status: 200, description: 'List of products with decants', type: [ProductResponseDto] })
-  findAllWithDecants() {
-    return this.productsService.findAllWithDecants();
-  }
-
   @Get(':id')
   @Public()
-  @ApiOperation({ 
-    summary: 'Get product by ID', 
-    description: 'Retrieve a specific product by ID with all details including variations' 
+  @ApiOperation({
+    summary: 'Get product by ID',
+    description: 'Retrieve a specific product by ID with all details including variations'
   })
   @ApiParam({ name: 'id', type: 'number', description: 'Product ID' })
   @ApiQuery({ name: 'includeVariations', required: false, type: Boolean, description: 'Include product variations in response (default: true)' })
@@ -71,15 +63,6 @@ export class ProductsController {
   ) {
     const include = includeVariations !== 'false';
     return this.productsService.findOne(+id, include);
-  }
-
-  @Get(':id/decants')
-  @Public()
-  @ApiOperation({ summary: 'Get product decants', description: 'Retrieve all decants for a specific product' })
-  @ApiParam({ name: 'id', type: 'number', description: 'Product ID' })
-  @ApiResponse({ status: 200, description: 'List of decants', type: [ProductResponseDto] })
-  findDecants(@Param('id') id: string) {
-    return this.productsService.findDecants(+id);
   }
 
   @Patch(':id')

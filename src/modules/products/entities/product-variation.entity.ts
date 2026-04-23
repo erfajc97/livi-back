@@ -33,10 +33,6 @@ export class ProductVariation {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   price: number;
 
-  // Variation-specific stock
-  @Column({ default: 0 })
-  stock: number;
-
   // SKU for this specific variation
   @Column({ nullable: true, unique: true })
   sku: string;
@@ -53,6 +49,14 @@ export class ProductVariation {
     inverseJoinColumn: { name: 'optionValueId', referencedColumnName: 'id' },
   })
   optionValues: ProductOptionValue[];
+
+  // Decant size in ml (e.g., 3, 5, 10) or full bottle ml
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  mlSize: number;
+
+  // Whether this variation represents a full sealed bottle
+  @Column({ default: false })
+  isFullBottle: boolean;
 
   @Column({ default: true })
   isActive: boolean;
