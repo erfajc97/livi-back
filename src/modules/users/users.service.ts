@@ -192,7 +192,7 @@ export class UsersService {
   }
 
   async findAll(): Promise<UserResponseDto[]> {
-    const users = await this.usersRepository.find();
+    const users = await this.usersRepository.find({ order: { createdAt: 'DESC' } });
     return users.map((user) => new UserResponseDto(user));
   }
 

@@ -43,19 +43,64 @@ export class Order {
   })
   status: OrderStatus;
 
-  // Total amount (sum of all items subtotals)
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  // Amounts
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  subtotal: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  deliveryCost: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  payphoneSurcharge: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  couponDiscount: number;
+
+  // Total amount (subtotal + deliveryCost + surcharge - couponDiscount)
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   total: number;
 
-  // Payment information (manual for now, will be payment provider later)
+  // Customer info (for guest checkout)
+  @Column({ nullable: true })
+  customerName: string;
+
+  @Column({ nullable: true })
+  customerEmail: string;
+
+  @Column({ nullable: true })
+  customerPhone: string;
+
+  // Delivery
+  @Column({ nullable: true })
+  deliveryMethod: string;
+
+  // Payment information
   @Column({ nullable: true })
   paymentMethod: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, default: 'pending' })
   paymentStatus: string;
 
   @Column({ nullable: true })
   paymentReference: string;
+
+  // Tracking (Servientrega guide number)
+  @Column({ nullable: true })
+  trackingCode: string;
+
+  // Transfer receipt image
+  @Column({ nullable: true })
+  transferReceiptUrl: string;
+
+  @Column({ nullable: true })
+  transferReceiptKey: string;
+
+  // PayPhone specific
+  @Column({ nullable: true })
+  payphonePaymentId: string;
+
+  @Column({ nullable: true })
+  clientTransactionId: string;
 
   // Shipping information
   @Column({ nullable: true })

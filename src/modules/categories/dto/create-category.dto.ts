@@ -13,7 +13,19 @@ export class CreateCategoryDto {
   @IsOptional()
   slug?: string;
 
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  imageKey?: string;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  bajoPedido?: boolean;
 }

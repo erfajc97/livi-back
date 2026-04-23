@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
 import { Order } from '../orders/entities/order.entity';
@@ -28,9 +28,20 @@ export class DashboardService {
   ) {}
 
   async getStats() {
+    // Today at midnight (UTC-5 Ecuador)
+    const now = new Date();
+    const ecuadorOffset = -5 * 60 * 60 * 1000;
+    const ecuadorNow = new Date(now.getTime() + ecuadorOffset);
+    const todayStart = new Date(Date.UTC(
+      ecuadorNow.getUTCFullYear(),
+      ecuadorNow.getUTCMonth(),
+      ecuadorNow.getUTCDate(),
+    ));
+    // Convert back to UTC for DB query
+    const todayStartUTC = new Date(todayStart.getTime() - ecuadorOffset);
+
     const [
       totalProducts,
-      totalDecants,
       totalUsers,
       totalClients,
       totalOrders,
@@ -40,8 +51,7 @@ export class DashboardService {
       totalCombos,
       activeCombos,
     ] = await Promise.all([
-      this.productsRepository.count({ where: { parentProductId: IsNull() } }),
-      this.productsRepository.count({ where: { parentProductId: Not(IsNull()) } }),
+      this.productsRepository.count(),
       this.usersRepository.count(),
       this.usersRepository.count({ where: { role: Role.CLIENT } }),
       this.ordersRepository.count(),
@@ -52,23 +62,17 @@ export class DashboardService {
       this.combosRepository.count({ where: { isActive: true } }),
     ]);
 
-    // Calculate total stock from all products
+    // Stock
     const stockResult = await this.productsRepository
       .createQueryBuilder('product')
       .select('SUM(product.stock)', 'totalStock')
-      .where('product.parentProductId IS NULL')
       .getRawOne();
-
     const totalStock = parseInt(stockResult?.totalStock || '0', 10);
 
-    // Low stock products (stock < 10)
     const lowStockCount = await this.productsRepository
       .createQueryBuilder('product')
-      .where('product.parentProductId IS NULL')
-      .andWhere('product.stock < :threshold', { threshold: 10 })
+      .where('product.stock < :threshold AND product.stock > 0', { threshold: 10 })
       .getCount();
-
-    const maxStock = totalProducts * 400;
 
     // Order status breakdown
     const orderStatusCounts = await this.ordersRepository
@@ -83,14 +87,32 @@ export class DashboardService {
       statusMap[row.status] = parseInt(row.count, 10);
     }
 
-    // Revenue from delivered orders
-    const revenueResult = await this.ordersRepository
+    // Revenue total (all delivered orders)
+    const totalRevenueResult = await this.ordersRepository
       .createQueryBuilder('order')
-      .select('COALESCE(SUM(order.total), 0)', 'totalRevenue')
-      .where('order.status = :status', { status: OrderStatus.DELIVERED })
+      .select('COALESCE(SUM(order.total), 0)', 'revenue')
+      .addSelect('COUNT(*)', 'count')
+      .where('order.status IN (:...paidStatuses)', {
+        paidStatuses: [OrderStatus.RECEIVED, OrderStatus.ACCEPTED, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
+      })
       .getRawOne();
 
-    const totalRevenue = parseFloat(revenueResult?.totalRevenue || '0');
+    const totalRevenue = parseFloat(totalRevenueResult?.revenue || '0');
+    const totalPaidOrders = parseInt(totalRevenueResult?.count || '0', 10);
+
+    // Revenue today (orders created today that are paid/delivered)
+    const todayRevenueResult = await this.ordersRepository
+      .createQueryBuilder('order')
+      .select('COALESCE(SUM(order.total), 0)', 'revenue')
+      .addSelect('COUNT(*)', 'count')
+      .where('order.createdAt >= :todayStart', { todayStart: todayStartUTC })
+      .andWhere('order.status IN (:...paidStatuses)', {
+        paidStatuses: [OrderStatus.RECEIVED, OrderStatus.ACCEPTED, OrderStatus.SHIPPED, OrderStatus.DELIVERED],
+      })
+      .getRawOne();
+
+    const todayRevenue = parseFloat(todayRevenueResult?.revenue || '0');
+    const todayOrders = parseInt(todayRevenueResult?.count || '0', 10);
 
     // Recent orders (last 10)
     const recentOrders = await this.ordersRepository.find({
@@ -104,7 +126,7 @@ export class DashboardService {
       orderNumber: order.orderNumber,
       clientName: order.user
         ? `${order.user.firstName} ${order.user.lastName}`
-        : 'Cliente',
+        : order.customerName || 'Cliente',
       paymentMethod: order.paymentMethod || 'N/A',
       paymentStatus: order.paymentStatus || 'N/A',
       status: order.status,
@@ -115,11 +137,9 @@ export class DashboardService {
     return {
       products: {
         total: totalProducts,
-        decants: totalDecants,
       },
       stock: {
         available: totalStock,
-        capacity: maxStock,
         lowStock: lowStockCount,
       },
       users: {
@@ -128,7 +148,10 @@ export class DashboardService {
       },
       orders: {
         total: totalOrders,
-        revenue: totalRevenue,
+        totalRevenue,
+        totalPaidOrders,
+        todayRevenue,
+        todayOrders,
         byStatus: {
           pending: statusMap[OrderStatus.CREATED] || 0,
           paid: statusMap[OrderStatus.RECEIVED] || 0,

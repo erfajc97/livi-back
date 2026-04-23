@@ -4,9 +4,21 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
 } from 'typeorm';
+import { Category } from '../../categories/entities/category.entity';
+import { Marca } from '../../categories/entities/marca.entity';
+
+export enum BannerType {
+  HERO = 'hero',
+  CATEGORY = 'category',
+  BRAND = 'brand',
+}
 
 @Entity('banners')
+@Index(['type', 'position'])
 export class Banner {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
@@ -21,13 +33,36 @@ export class Banner {
   imageUrl: string;
 
   @Column({ nullable: true })
+  imageKey: string;
+
+  @Column({ nullable: true })
   link: string;
+
+  @Column({ nullable: true })
+  buttonText: string;
+
+  @Column({ type: 'enum', enum: BannerType, default: BannerType.HERO })
+  type: BannerType;
 
   @Column({ default: true })
   isVisible: boolean;
 
   @Column({ default: 0 })
   position: number;
+
+  @ManyToOne(() => Category, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'categoryId' })
+  category: Category;
+
+  @Column({ type: 'bigint', nullable: true })
+  categoryId: number;
+
+  @ManyToOne(() => Marca, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'subcategoryId' })
+  marca: Marca;
+
+  @Column({ name: 'subcategoryId', type: 'bigint', nullable: true })
+  marcaId: number;
 
   @CreateDateColumn()
   createdAt: Date;

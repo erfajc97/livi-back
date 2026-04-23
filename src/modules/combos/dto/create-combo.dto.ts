@@ -9,7 +9,7 @@ import {
   Min,
   IsUrl,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
 class ComboProductDto {
@@ -17,6 +17,11 @@ class ComboProductDto {
   @IsNumber()
   @IsNotEmpty()
   productId: number;
+
+  @ApiProperty({ description: 'Specific product variation ID (e.g., a decant size)', required: false })
+  @IsNumber()
+  @IsOptional()
+  productVariationId?: number;
 
   @ApiProperty({ description: 'Quantity of this product in the combo', default: 1 })
   @IsNumber()
@@ -47,10 +52,11 @@ export class CreateComboDto {
   @IsNotEmpty()
   finalPrice: number;
 
-  @ApiProperty({ description: 'Size label for combo items', example: '5ml C/U', required: false })
-  @IsString()
+  @ApiProperty({ description: 'Discount amount for the combo', example: 25.0, required: false })
+  @IsNumber()
+  @Min(0)
   @IsOptional()
-  sizeLabel?: string;
+  discount?: number;
 
   @ApiProperty({ description: 'Whether the combo is active', default: true })
   @IsBoolean()
@@ -58,6 +64,7 @@ export class CreateComboDto {
   isActive?: boolean;
 
   @ApiProperty({ description: 'Products in this combo', type: [ComboProductDto] })
+  @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ComboProductDto)

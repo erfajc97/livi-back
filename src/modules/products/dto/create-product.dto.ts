@@ -9,7 +9,7 @@ import {
   IsUrl,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductType, MeasureUnit } from '../entities/product.entity';
+import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
 
 export class CreateProductDto {
   @ApiProperty({ example: 'Paco Rabanne', description: 'Product name' })
@@ -17,21 +17,17 @@ export class CreateProductDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 'Paco Rabanne', description: 'Product brand' })
-  @IsString()
-  @IsNotEmpty()
-  brand: string;
-
-  @ApiProperty({ example: 120.0, description: 'Product price', minimum: 0 })
+  @ApiProperty({ example: 120.0, description: 'Product price (full bottle)', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsNotEmpty()
   price: number;
 
-  @ApiProperty({ enum: ProductType, example: ProductType.PERFUME, description: 'Product type' })
-  @IsEnum(ProductType)
+  @ApiProperty({ example: 100, description: 'Total ml per bottle', minimum: 0 })
+  @IsNumber()
+  @Min(0)
   @IsNotEmpty()
-  type: ProductType;
+  totalMl: number;
 
   @ApiPropertyOptional({ example: 'Iconic fragrance with fresh and woody notes', description: 'Product description' })
   @IsString()
@@ -43,40 +39,65 @@ export class CreateProductDto {
   @IsOptional()
   imageUrl?: string;
 
-  @ApiPropertyOptional({ example: 50, description: 'Product stock quantity', minimum: 0 })
+  @ApiPropertyOptional({ example: 50, description: 'Sealed bottles in stock', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsOptional()
   stock?: number;
-
-  @ApiPropertyOptional({ example: 100, description: 'Measurement value (e.g., volume in ml)', minimum: 0 })
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  measureValue?: number;
-
-  @ApiPropertyOptional({ enum: MeasureUnit, example: MeasureUnit.ML, description: 'Measurement unit' })
-  @IsEnum(MeasureUnit)
-  @IsOptional()
-  measureUnit?: MeasureUnit;
 
   @ApiProperty({ example: 1, description: 'Category ID' })
   @IsNumber()
   @IsNotEmpty()
   categoryId: number;
 
-  @ApiProperty({ example: 1, description: 'Subcategory ID' })
+  @ApiProperty({ example: 1, description: 'Marca ID' })
   @IsNumber()
   @IsNotEmpty()
-  subcategoryId: number;
-
-  @ApiPropertyOptional({ example: 1, description: 'Parent product ID (for decants)' })
-  @IsNumber()
-  @IsOptional()
-  parentProductId?: number; // For decants
+  marcaId: number;
 
   @ApiPropertyOptional({ example: true, description: 'Product active status', default: true })
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ example: false, description: 'Available for pre-order (bajo pedido)', default: false })
+  @IsBoolean()
+  @IsOptional()
+  bajoPedido?: boolean;
+
+  @ApiPropertyOptional({ enum: Gender, example: Gender.HOMBRE, description: 'Target gender' })
+  @IsEnum(Gender)
+  @IsOptional()
+  gender?: Gender;
+
+  @ApiPropertyOptional({ enum: TimeOfDay, example: TimeOfDay.DIA, description: 'Recommended time of day' })
+  @IsEnum(TimeOfDay)
+  @IsOptional()
+  timeOfDay?: TimeOfDay;
+
+  @ApiPropertyOptional({ enum: Concentration, example: Concentration.EAU_DE_PARFUM, description: 'Fragrance concentration' })
+  @IsEnum(Concentration)
+  @IsOptional()
+  concentration?: Concentration;
+
+  @ApiPropertyOptional({ enum: Projection, example: Projection.MODERADA, description: 'Fragrance projection' })
+  @IsEnum(Projection)
+  @IsOptional()
+  projection?: Projection;
+
+  @ApiPropertyOptional({ example: 15.5, description: 'Discount percentage (0-100)', minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  discount?: number;
+
+  @ApiPropertyOptional({ example: 'A rich and complex fragrance...', description: 'Long detailed description (markdown-like)' })
+  @IsString()
+  @IsOptional()
+  detailDescription?: string;
+
+  @ApiPropertyOptional({ example: '["Long lasting","Versatile"]', description: 'Benefits stored as JSON array of strings' })
+  @IsString()
+  @IsOptional()
+  benefits?: string;
 }

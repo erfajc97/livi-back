@@ -29,6 +29,16 @@ export class UpdateOrderDto extends PartialType(CreateOrderDto) {
   @IsOptional()
   paymentReference?: string;
 
+  @ApiPropertyOptional({ description: 'Tracking code (Servientrega guide number)' })
+  @IsString()
+  @IsOptional()
+  trackingCode?: string;
+
+  @ApiPropertyOptional({ description: 'Note for status change (saved to history, not order)' })
+  @IsString()
+  @IsOptional()
+  statusNote?: string;
+
   @ApiPropertyOptional({ example: 'Please handle with care', description: 'Order notes' })
   @IsString()
   @IsOptional()

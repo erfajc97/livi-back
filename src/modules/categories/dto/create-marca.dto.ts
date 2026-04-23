@@ -1,6 +1,6 @@
 import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean } from 'class-validator';
 
-export class CreateSubcategoryDto {
+export class CreateMarcaDto {
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -20,4 +20,16 @@ export class CreateSubcategoryDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  bajoPedido?: boolean;
+
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  imageKey?: string;
 }

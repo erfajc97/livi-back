@@ -1,5 +1,6 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { BannerType } from '../entities/banner.entity';
 
 export class CreateBannerDto {
   @ApiProperty({ example: 'Promo Verano', description: 'Banner title' })
@@ -17,10 +18,25 @@ export class CreateBannerDto {
   @IsOptional()
   imageUrl?: string;
 
+  @ApiPropertyOptional({ description: 'S3 image key for deletion' })
+  @IsString()
+  @IsOptional()
+  imageKey?: string;
+
   @ApiPropertyOptional({ example: '/catalogo', description: 'Link or action URL' })
   @IsString()
   @IsOptional()
   link?: string;
+
+  @ApiPropertyOptional({ example: 'Ver Catálogo', description: 'CTA button text' })
+  @IsString()
+  @IsOptional()
+  buttonText?: string;
+
+  @ApiPropertyOptional({ enum: BannerType, example: BannerType.HERO, description: 'Banner type: hero, category, or marca (brand)' })
+  @IsEnum(BannerType)
+  @IsOptional()
+  type?: BannerType;
 
   @ApiPropertyOptional({ example: true, description: 'Whether the banner is visible' })
   @IsBoolean()
@@ -31,4 +47,14 @@ export class CreateBannerDto {
   @IsNumber()
   @IsOptional()
   position?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'Category ID (for category/marca banners)' })
+  @IsNumber()
+  @IsOptional()
+  categoryId?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'Marca ID (for marca banners)' })
+  @IsNumber()
+  @IsOptional()
+  marcaId?: number;
 }

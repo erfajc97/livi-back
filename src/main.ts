@@ -30,7 +30,7 @@ async function bootstrap() {
     .addTag('auth', 'Authentication endpoints')
     .addTag('users', 'User management endpoints')
     .addTag('products', 'Product management endpoints')
-    .addTag('categories', 'Category and subcategory management endpoints')
+    .addTag('categories', 'Category and marca management endpoints')
     .addTag('product-options', 'Product options and values management')
     .addTag('product-variations', 'Product variations management')
     .build();

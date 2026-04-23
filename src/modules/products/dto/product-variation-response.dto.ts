@@ -9,11 +9,14 @@ export class ProductVariationResponseDto {
   @ApiProperty()
   productId: number;
 
+  @ApiProperty({ description: 'Decant size in ml or full bottle ml' })
+  mlSize: number;
+
+  @ApiProperty({ description: 'Whether this is a full sealed bottle variation' })
+  isFullBottle: boolean;
+
   @ApiProperty({ required: false })
   price?: number;
-
-  @ApiProperty()
-  stock: number;
 
   @ApiProperty({ required: false })
   sku?: string;
@@ -38,6 +41,9 @@ export class ProductVariationResponseDto {
   @ApiProperty({ type: [ProductVideoResponseDto], required: false })
   videos?: ProductVideoResponseDto[];
 
+  @ApiProperty({ description: 'Calculated available quantity for this variation' })
+  availableQuantity: number;
+
   @ApiProperty()
   isActive: boolean;
 
@@ -47,14 +53,30 @@ export class ProductVariationResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  constructor(variation: any) {
+  constructor(variation: any, productStock?: number, productTotalMl?: number, productOpenMl?: number) {
     this.id = variation.id;
     this.productId = variation.productId;
+    this.mlSize = Number(variation.mlSize || 0);
+    this.isFullBottle = variation.isFullBottle ?? false;
     this.price = variation.price;
-    this.stock = variation.stock;
     this.sku = variation.sku;
     this.name = variation.name;
     this.isActive = variation.isActive;
+
+    // Calculate available quantity from product-level stock
+    const stock = productStock ?? 0;
+    const totalMl = productTotalMl ?? 100;
+    const openMl = productOpenMl ?? 0;
+    const mlSize = Number(variation.mlSize || 0);
+    if (variation.isFullBottle) {
+      this.availableQuantity = stock;
+    } else if (mlSize > 0) {
+      const totalAvailableMl = openMl + stock * totalMl;
+      this.availableQuantity = Math.floor(totalAvailableMl / mlSize);
+    } else {
+      this.availableQuantity = 0;
+    }
+
     this.createdAt = variation.createdAt;
     this.updatedAt = variation.updatedAt;
 

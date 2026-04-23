@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -16,19 +16,6 @@ export class ProductsService {
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<ProductResponseDto> {
-    // Validate parent product exists if it's a decant
-    if (createProductDto.parentProductId) {
-      const parentProduct = await this.productsRepository.findOne({
-        where: { id: createProductDto.parentProductId },
-      });
-
-      if (!parentProduct) {
-        throw new NotFoundException(
-          `Parent product with ID ${createProductDto.parentProductId} not found`,
-        );
-      }
-    }
-
     const product = this.productsRepository.create(createProductDto);
     const savedProduct = await this.productsRepository.save(product);
 
@@ -37,24 +24,14 @@ export class ProductsService {
 
   async findAll(): Promise<ProductResponseDto[]> {
     const products = await this.productsRepository.find({
-      relations: ['category', 'subcategory', 'decants', 'images', 'videos'],
-      where: { parentProductId: IsNull() }, // Only return main products, not decants
-    });
-
-    return products.map((product) => new ProductResponseDto(product));
-  }
-
-  async findAllWithDecants(): Promise<ProductResponseDto[]> {
-    const products = await this.productsRepository.find({
-      relations: ['category', 'subcategory', 'decants', 'images', 'videos'],
-      where: { parentProductId: IsNull() },
+      relations: ['category', 'marca', 'images', 'videos'],
     });
 
     return products.map((product) => new ProductResponseDto(product));
   }
 
   async findOne(id: number, includeVariations: boolean = false): Promise<ProductResponseDto> {
-    const relations = ['category', 'subcategory', 'parentProduct', 'decants', 'images', 'videos'];
+    const relations = ['category', 'marca', 'images', 'videos'];
     if (includeVariations) {
       relations.push(
         'variations',
@@ -84,46 +61,40 @@ export class ProductsService {
     const {
       page = 1,
       limit = 20,
-      type,
       categoryId,
-      subcategoryId,
-      brand,
+      marcaId,
       search,
       minPrice,
       maxPrice,
       isActive = true,
-      measureUnit,
+      bajoPedido,
+      gender,
+      timeOfDay,
+      concentration,
+      projection,
+      hasDiscount,
       sortBy = 'createdAt',
       sortOrder = 'DESC',
     } = filterDto;
 
     const queryBuilder = this.productsRepository.createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.subcategory', 'subcategory')
+      .leftJoinAndSelect('product.marca', 'marca')
       .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect('product.videos', 'videos')
-      .where('product.parentProductId IS NULL'); // Only main products, not decants
+      .leftJoinAndSelect('product.videos', 'videos');
 
     // Apply filters
-    if (type) {
-      queryBuilder.andWhere('product.type = :type', { type });
-    }
-
     if (categoryId) {
       queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId });
     }
 
-    if (subcategoryId) {
-      queryBuilder.andWhere('product.subcategoryId = :subcategoryId', { subcategoryId });
-    }
-
-    if (brand) {
-      queryBuilder.andWhere('product.brand ILIKE :brand', { brand: `%${brand}%` });
+    if (marcaId) {
+      queryBuilder.andWhere('product.marcaId = :marcaId', { marcaId });
     }
 
     if (search) {
       queryBuilder.andWhere(
-        '(product.name ILIKE :search OR product.brand ILIKE :search OR product.description ILIKE :search)',
+        '(product.name ILIKE :search OR product.description ILIKE :search)',
         { search: `%${search}%` },
       );
     }
@@ -140,12 +111,36 @@ export class ProductsService {
       queryBuilder.andWhere('product.isActive = :isActive', { isActive });
     }
 
-    if (measureUnit) {
-      queryBuilder.andWhere('product.measureUnit = :measureUnit', { measureUnit });
+    if (bajoPedido !== undefined && bajoPedido !== null) {
+      const bajoPedidoBool = String(bajoPedido) === 'true';
+      queryBuilder.andWhere('product.bajoPedido = :bajoPedido', { bajoPedido: bajoPedidoBool });
+    }
+
+    if (gender) {
+      queryBuilder.andWhere('product.gender = :gender', { gender });
+    }
+
+    if (timeOfDay) {
+      queryBuilder.andWhere('product.timeOfDay = :timeOfDay', { timeOfDay });
+    }
+
+    if (concentration) {
+      queryBuilder.andWhere('product.concentration = :concentration', { concentration });
+    }
+
+    if (projection) {
+      queryBuilder.andWhere('product.projection = :projection', { projection });
+    }
+
+    if (hasDiscount !== undefined && hasDiscount !== null) {
+      const hasDiscountBool = String(hasDiscount) === 'true';
+      if (hasDiscountBool) {
+        queryBuilder.andWhere('product.discount IS NOT NULL AND product.discount > 0');
+      }
     }
 
     // Validate and apply sorting
-    const allowedSortFields = ['name', 'price', 'brand', 'createdAt', 'updatedAt'];
+    const allowedSortFields = ['name', 'price', 'createdAt', 'updatedAt', 'discount', 'salesCount'];
     const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
     const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     queryBuilder.orderBy(`product.${sortField}`, order);
@@ -165,38 +160,20 @@ export class ProductsService {
 
   async findByCategory(categoryId: number): Promise<ProductResponseDto[]> {
     const products = await this.productsRepository.find({
-      where: { categoryId, parentProductId: IsNull() },
-      relations: ['category', 'subcategory', 'decants', 'images', 'videos'],
+      where: { categoryId },
+      relations: ['category', 'marca', 'images', 'videos'],
     });
 
     return products.map((product) => new ProductResponseDto(product));
   }
 
-  async findBySubcategory(subcategoryId: number): Promise<ProductResponseDto[]> {
+  async findByMarca(marcaId: number): Promise<ProductResponseDto[]> {
     const products = await this.productsRepository.find({
-      where: { subcategoryId, parentProductId: IsNull() },
-      relations: ['category', 'subcategory', 'decants', 'images', 'videos'],
+      where: { marcaId },
+      relations: ['category', 'marca', 'images', 'videos'],
     });
 
     return products.map((product) => new ProductResponseDto(product));
-  }
-
-  async findByBrand(brand: string): Promise<ProductResponseDto[]> {
-    const products = await this.productsRepository.find({
-      where: { brand, parentProductId: IsNull() },
-      relations: ['category', 'subcategory', 'decants', 'images', 'videos'],
-    });
-
-    return products.map((product) => new ProductResponseDto(product));
-  }
-
-  async findDecants(parentProductId: number): Promise<ProductResponseDto[]> {
-    const decants = await this.productsRepository.find({
-      where: { parentProductId },
-      relations: ['category', 'subcategory', 'images', 'videos'],
-    });
-
-    return decants.map((decant) => new ProductResponseDto(decant));
   }
 
   async update(id: number, updateProductDto: UpdateProductDto): Promise<ProductResponseDto> {
@@ -204,24 +181,6 @@ export class ProductsService {
 
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
-    }
-
-    // Validate parent product if being updated
-    if (updateProductDto.parentProductId) {
-      const parentProduct = await this.productsRepository.findOne({
-        where: { id: updateProductDto.parentProductId },
-      });
-
-      if (!parentProduct) {
-        throw new NotFoundException(
-          `Parent product with ID ${updateProductDto.parentProductId} not found`,
-        );
-      }
-
-      // Prevent circular reference
-      if (updateProductDto.parentProductId === id) {
-        throw new ConflictException('Product cannot be its own parent');
-      }
     }
 
     Object.assign(product, updateProductDto);
@@ -233,18 +192,10 @@ export class ProductsService {
   async remove(id: number): Promise<void> {
     const product = await this.productsRepository.findOne({
       where: { id },
-      relations: ['decants'],
     });
 
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
-    }
-
-    // Check if product has decants
-    if (product.decants && product.decants.length > 0) {
-      throw new ConflictException(
-        'Cannot delete product with existing decants. Please delete decants first.',
-      );
     }
 
     await this.productsRepository.remove(product);

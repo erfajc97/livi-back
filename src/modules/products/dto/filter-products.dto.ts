@@ -1,31 +1,21 @@
-import { IsOptional, IsString, IsNumber, IsEnum, IsBoolean, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsEnum, IsBoolean, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductType, MeasureUnit } from '../entities/product.entity';
+import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class FilterProductsDto extends PaginationDto {
-  @ApiPropertyOptional({ example: 'perfume', description: 'Filter by product type', enum: ProductType })
-  @IsOptional()
-  @IsEnum(ProductType)
-  type?: ProductType;
-
   @ApiPropertyOptional({ example: 1, description: 'Filter by category ID' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   categoryId?: number;
 
-  @ApiPropertyOptional({ example: 1, description: 'Filter by subcategory ID' })
+  @ApiPropertyOptional({ example: 1, description: 'Filter by marca ID' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  subcategoryId?: number;
-
-  @ApiPropertyOptional({ example: 'Dior', description: 'Filter by brand name' })
-  @IsOptional()
-  @IsString()
-  brand?: string;
+  marcaId?: number;
 
   @ApiPropertyOptional({ example: 'Sauvage', description: 'Search in product name' })
   @IsOptional()
@@ -52,12 +42,35 @@ export class FilterProductsDto extends PaginationDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ example: 'ml', description: 'Filter by measure unit', enum: MeasureUnit })
+  @ApiPropertyOptional({ example: false, description: 'Filter by bajo pedido status' })
   @IsOptional()
-  @IsEnum(MeasureUnit)
-  measureUnit?: MeasureUnit;
+  bajoPedido?: string;
 
-  @ApiPropertyOptional({ example: 'name', description: 'Sort by field (name, price, brand, createdAt)', default: 'createdAt' })
+  @ApiPropertyOptional({ enum: Gender, description: 'Filter by gender' })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  @ApiPropertyOptional({ enum: TimeOfDay, description: 'Filter by time of day' })
+  @IsOptional()
+  @IsEnum(TimeOfDay)
+  timeOfDay?: TimeOfDay;
+
+  @ApiPropertyOptional({ enum: Concentration, description: 'Filter by concentration' })
+  @IsOptional()
+  @IsEnum(Concentration)
+  concentration?: Concentration;
+
+  @ApiPropertyOptional({ enum: Projection, description: 'Filter by projection' })
+  @IsOptional()
+  @IsEnum(Projection)
+  projection?: Projection;
+
+  @ApiPropertyOptional({ example: true, description: 'Filter products with discount' })
+  @IsOptional()
+  hasDiscount?: string;
+
+  @ApiPropertyOptional({ example: 'name', description: 'Sort by field (name, price, createdAt)', default: 'createdAt' })
   @IsOptional()
   @IsString()
   sortBy?: string = 'createdAt';

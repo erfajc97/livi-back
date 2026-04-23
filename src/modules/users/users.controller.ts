@@ -17,7 +17,9 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../common/constants/roles.enum';
+import { User } from './entities/user.entity';
 
 @ApiTags('users')
 @Controller('users')
@@ -41,6 +43,26 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'List of users', type: [UserResponseDto] })
   findAll() {
     return this.usersService.findAll();
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.CLIENT, Role.ADMIN)
+  @ApiOperation({ summary: 'Get current user profile', description: 'Get the authenticated user profile' })
+  @ApiResponse({ status: 200, type: UserResponseDto })
+  getMe(@CurrentUser() user: User) {
+    return this.usersService.findOne(user.id);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.CLIENT, Role.ADMIN)
+  @ApiOperation({ summary: 'Update current user profile', description: 'Update the authenticated user profile' })
+  @ApiResponse({ status: 200, type: UserResponseDto })
+  updateMe(@CurrentUser() user: User, @Body() updateUserDto: UpdateUserDto) {
+    return this.usersService.update(user.id, updateUserDto);
   }
 
   @Get(':id')

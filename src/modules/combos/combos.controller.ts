@@ -7,8 +7,11 @@ import {
   Param,
   Delete,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { CombosService } from './combos.service';
 import { CreateComboDto } from './dto/create-combo.dto';
 import { UpdateComboDto } from './dto/update-combo.dto';
@@ -27,10 +30,15 @@ export class CombosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Create a new combo' })
   @ApiResponse({ status: 201, description: 'Combo created successfully' })
-  create(@Body() createComboDto: CreateComboDto) {
-    return this.combosService.create(createComboDto);
+  create(
+    @Body() createComboDto: CreateComboDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.combosService.create(createComboDto, file);
   }
 
   @Get()
@@ -60,9 +68,15 @@ export class CombosController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Update a combo' })
-  update(@Param('id') id: string, @Body() updateComboDto: UpdateComboDto) {
-    return this.combosService.update(+id, updateComboDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateComboDto: UpdateComboDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.combosService.update(+id, updateComboDto, file);
   }
 
   @Delete(':id')

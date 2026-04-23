@@ -14,8 +14,10 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
+import { OrderStatusHistory } from './entities/order-status-history.entity';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { CartService } from '../cart/cart.service';
+import { StockService } from '../products/stock.service';
 
 @Injectable()
 export class OrdersService {
@@ -28,9 +30,42 @@ export class OrdersService {
     private productsRepository: Repository<Product>,
     @InjectRepository(ProductVariation)
     private productVariationsRepository: Repository<ProductVariation>,
+    @InjectRepository(OrderStatusHistory)
+    private statusHistoryRepository: Repository<OrderStatusHistory>,
     private dataSource: DataSource,
     private cartService: CartService,
+    private stockService: StockService,
   ) {}
+
+  /**
+   * Record a status change in history
+   */
+  private async recordStatusChange(
+    orderId: number,
+    fromStatus: string,
+    toStatus: string,
+    changedBy?: string,
+    note?: string,
+  ) {
+    const entry = this.statusHistoryRepository.create({
+      orderId,
+      fromStatus,
+      toStatus,
+      changedBy: changedBy ?? 'sistema',
+      note,
+    });
+    await this.statusHistoryRepository.save(entry);
+  }
+
+  /**
+   * Get status history for an order
+   */
+  async getStatusHistory(orderId: number) {
+    return this.statusHistoryRepository.find({
+      where: { orderId: orderId as any },
+      order: { createdAt: 'ASC' },
+    });
+  }
 
   /**
    * Generate unique order number
@@ -100,19 +135,11 @@ export class OrdersService {
             );
           }
 
-          // Check stock
-          if (productVariation.stock < itemDto.quantity) {
-            throw new BadRequestException(
-              `Insufficient stock for variation ${itemDto.productVariationId}. Available: ${productVariation.stock}, Requested: ${itemDto.quantity}`,
-            );
-          }
+          // TODO: Phase 2 — use StockService for decant/full-bottle stock deduction
+          // For now, basic stock check on the product level
           price = productVariation.price || product.price;
           productId = product.id;
           productVariationId = productVariation.id;
-
-          // Update stock
-          productVariation.stock -= itemDto.quantity;
-          await queryRunner.manager.save(ProductVariation, productVariation);
         } else if (itemDto.productId) {
           // Ordering base product
           product = await this.productsRepository.findOne({
@@ -186,18 +213,26 @@ export class OrdersService {
         orderItems.push(orderItem);
       }
 
+      // Fetch user info for customer details
+      const orderUser = await queryRunner.manager.findOneBy('User', { id: userId });
+
       // Create order
       const orderNumber = this.generateOrderNumber();
       const order = queryRunner.manager.create(Order, {
         orderNumber,
         userId,
         status: OrderStatus.CREATED,
+        subtotal: total,
         total,
+        customerName: orderUser ? `${(orderUser as any).firstName} ${(orderUser as any).lastName}`.trim() : undefined,
+        customerEmail: (orderUser as any)?.email,
+        customerPhone: (orderUser as any)?.phone,
+        deliveryMethod: (orderUser as any)?.preferredDeliveryMethod,
         paymentMethod: createOrderDto.paymentMethod,
-        shippingAddress: createOrderDto.shippingAddress,
-        shippingCity: createOrderDto.shippingCity,
+        shippingAddress: createOrderDto.shippingAddress || (orderUser as any)?.address,
+        shippingCity: createOrderDto.shippingCity || (orderUser as any)?.city,
         shippingPostalCode: createOrderDto.shippingPostalCode,
-        shippingCountry: createOrderDto.shippingCountry,
+        shippingCountry: createOrderDto.shippingCountry || 'Ecuador',
         notes: createOrderDto.notes,
         items: orderItems,
       });
@@ -261,7 +296,7 @@ export class OrdersService {
 
     const orders = await this.ordersRepository.find({
       where,
-      relations: ['items', 'user'],
+      relations: ['items', 'items.product', 'items.productVariation', 'user'],
       order: { createdAt: 'DESC' },
     });
 
@@ -274,7 +309,7 @@ export class OrdersService {
   async findOne(id: number, userId: number, userRole?: string): Promise<OrderResponseDto> {
     const order = await this.ordersRepository.findOne({
       where: { id },
-      relations: ['items'],
+      relations: ['items', 'items.product', 'items.productVariation', 'user'],
     });
 
     if (!order) {
@@ -290,6 +325,89 @@ export class OrdersService {
   }
 
   /**
+   * Statuses that indicate stock has already been deducted.
+   * Used to determine if stock needs to be restored on cancellation.
+   */
+  private static readonly STOCK_DEDUCTED_STATUSES: OrderStatus[] = [
+    OrderStatus.RECEIVED,
+    OrderStatus.ACCEPTED,
+    OrderStatus.SHIPPED,
+    OrderStatus.DELIVERED,
+    OrderStatus.DELAYED,
+  ];
+
+  /**
+   * Deduct stock for all items in an order using a transaction.
+   */
+  private async deductStockForOrder(
+    order: Order,
+    queryRunner: import('typeorm').QueryRunner,
+  ): Promise<void> {
+    for (const item of order.items) {
+      if (!item.productVariationId) continue;
+
+      const variation = await this.productVariationsRepository.findOne({
+        where: { id: item.productVariationId },
+        relations: ['product'],
+      });
+
+      if (!variation || !variation.product) continue;
+
+      if (variation.isFullBottle) {
+        await this.stockService.deductFullBottleStock(
+          variation.product,
+          item.quantity,
+          queryRunner,
+        );
+      } else {
+        const result = await this.stockService.deductDecantStock(
+          variation.product,
+          Number(variation.mlSize),
+          item.quantity,
+          queryRunner,
+        );
+
+        item.mlDeducted = result.mlDeducted;
+        item.bottlesOpened = result.bottlesOpened;
+        await queryRunner.manager.save(OrderItem, item);
+      }
+    }
+  }
+
+  /**
+   * Restore stock for all items in an order using a transaction.
+   */
+  private async restoreStockForOrder(
+    order: Order,
+    queryRunner: import('typeorm').QueryRunner,
+  ): Promise<void> {
+    for (const item of order.items) {
+      if (!item.productVariationId) continue;
+
+      const variation = await this.productVariationsRepository.findOne({
+        where: { id: item.productVariationId },
+        relations: ['product'],
+      });
+
+      if (!variation || !variation.product) continue;
+
+      if (variation.isFullBottle) {
+        await this.stockService.restoreFullBottleStock(
+          variation.product,
+          item.quantity,
+          queryRunner,
+        );
+      } else if (item.mlDeducted && Number(item.mlDeducted) > 0) {
+        await this.stockService.restoreDecantStock(
+          variation.product,
+          Number(item.mlDeducted),
+          queryRunner,
+        );
+      }
+    }
+  }
+
+  /**
    * Update order (admin only for status changes, user can update their own orders in certain states)
    */
   async update(
@@ -297,10 +415,11 @@ export class OrdersService {
     updateOrderDto: UpdateOrderDto,
     userId: number,
     userRole: string,
+    userName?: string,
   ): Promise<OrderResponseDto> {
     const order = await this.ordersRepository.findOne({
       where: { id },
-      relations: ['items'],
+      relations: ['items', 'items.product', 'items.productVariation', 'user'],
     });
 
     if (!order) {
@@ -328,8 +447,62 @@ export class OrdersService {
       }
     }
 
-    // Update status and set corresponding timestamp
-    if (updateOrderDto.status && updateOrderDto.status !== order.status) {
+    // Determine if stock operations are needed
+    const isStatusChanging = updateOrderDto.status && updateOrderDto.status !== order.status;
+    const needsStockDeduction =
+      isStatusChanging && updateOrderDto.status === OrderStatus.RECEIVED;
+    const needsStockRestoration =
+      isStatusChanging &&
+      updateOrderDto.status === OrderStatus.CANCELLED &&
+      OrdersService.STOCK_DEDUCTED_STATUSES.includes(order.status);
+
+    // Use a transaction when stock operations are involved
+    if (needsStockDeduction || needsStockRestoration) {
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        const previousStatus = order.status;
+        const now = new Date();
+
+        if (needsStockDeduction) {
+          order.receivedAt = now;
+          order.status = OrderStatus.RECEIVED;
+          await this.deductStockForOrder(order, queryRunner);
+        } else if (needsStockRestoration) {
+          order.cancelledAt = now;
+          order.status = OrderStatus.CANCELLED;
+          await this.restoreStockForOrder(order, queryRunner);
+        }
+
+        // Apply other field updates
+        this.applyNonStatusUpdates(order, updateOrderDto);
+
+        await queryRunner.manager.save(Order, order);
+        await queryRunner.commitTransaction();
+
+        // Record status change in history (outside transaction, non-critical)
+        await this.recordStatusChange(
+          order.id,
+          previousStatus,
+          updateOrderDto.status!,
+          userName || (userRole === 'admin' ? 'Administrador' : 'Cliente'),
+          updateOrderDto.statusNote,
+        );
+
+        return new OrderResponseDto(order);
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
+    }
+
+    // No stock operations needed — proceed without queryRunner
+    if (isStatusChanging) {
+      const previousStatus = order.status;
       const now = new Date();
 
       switch (updateOrderDto.status) {
@@ -350,17 +523,34 @@ export class OrdersService {
           break;
         case OrderStatus.CANCELLED:
           order.cancelledAt = now;
-          // TODO: Restore stock when order is cancelled
           break;
         case OrderStatus.DELAYED:
-          // Delay doesn't have a specific timestamp, but we can track it in notes
           break;
       }
 
-      order.status = updateOrderDto.status;
+      order.status = updateOrderDto.status!;
+
+      // Record status change in history
+      await this.recordStatusChange(
+        order.id,
+        previousStatus,
+        updateOrderDto.status!,
+        userName || (userRole === 'admin' ? 'Administrador' : 'Cliente'),
+        updateOrderDto.statusNote,
+      );
     }
 
-    // Update other fields
+    // Apply other field updates
+    this.applyNonStatusUpdates(order, updateOrderDto);
+
+    const updatedOrder = await this.ordersRepository.save(order);
+    return new OrderResponseDto(updatedOrder);
+  }
+
+  /**
+   * Apply non-status field updates to an order
+   */
+  private applyNonStatusUpdates(order: Order, updateOrderDto: UpdateOrderDto): void {
     if (updateOrderDto.paymentMethod !== undefined) {
       order.paymentMethod = updateOrderDto.paymentMethod;
     }
@@ -370,12 +560,12 @@ export class OrdersService {
     if (updateOrderDto.paymentReference !== undefined) {
       order.paymentReference = updateOrderDto.paymentReference;
     }
+    if (updateOrderDto.trackingCode !== undefined) {
+      order.trackingCode = updateOrderDto.trackingCode;
+    }
     if (updateOrderDto.notes !== undefined) {
       order.notes = updateOrderDto.notes;
     }
-
-    const updatedOrder = await this.ordersRepository.save(order);
-    return new OrderResponseDto(updatedOrder);
   }
 
   /**
@@ -402,10 +592,15 @@ export class OrdersService {
    * Create a manual order on behalf of a client (admin only)
    */
   async createManualOrder(dto: CreateManualOrderDto): Promise<OrderResponseDto> {
+    // Fetch user's saved address for the order
+    const user = await this.dataSource.getRepository('User').findOneBy({ id: dto.userId });
+
     const orderDto: CreateOrderDto = {
       items: dto.items,
       paymentMethod: dto.paymentMethod,
-      notes: dto.notes ? `[Venta manual] ${dto.notes}` : '[Venta manual]',
+      shippingAddress: (user as any)?.address || undefined,
+      shippingCity: (user as any)?.city || undefined,
+      notes: dto.notes || '[Venta manual]',
     };
 
     const order = await this.create(orderDto, dto.userId);
@@ -414,7 +609,7 @@ export class OrdersService {
     if (dto.discountAmount && dto.discountAmount > 0) {
       const savedOrder = await this.ordersRepository.findOne({
         where: { id: order.id },
-        relations: ['items'],
+        relations: ['items', 'items.product', 'items.productVariation', 'user'],
       });
       if (savedOrder) {
         savedOrder.total = Math.max(0, Number(savedOrder.total) - dto.discountAmount);

@@ -1,41 +1,57 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
-import { Subcategory } from './entities/subcategory.entity';
+import { Marca } from './entities/marca.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { CreateSubcategoryDto } from './dto/create-subcategory.dto';
-import { UpdateSubcategoryDto } from './dto/update-subcategory.dto';
+import { CreateMarcaDto } from './dto/create-marca.dto';
+import { UpdateMarcaDto } from './dto/update-marca.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { Product } from '../products/entities/product.entity';
 import { ProductResponseDto } from '../products/dto/product-response.dto';
+import { S3Service } from '../../common/services/s3.service';
 
 @Injectable()
 export class CategoriesService {
   constructor(
     @InjectRepository(Category)
     private categoriesRepository: Repository<Category>,
-    @InjectRepository(Subcategory)
-    private subcategoriesRepository: Repository<Subcategory>,
+    @InjectRepository(Marca)
+    private marcasRepository: Repository<Marca>,
     @InjectRepository(Product)
     private productsRepository: Repository<Product>,
+    private s3Service: S3Service,
   ) {}
 
   // Category methods
-  async createCategory(createCategoryDto: CreateCategoryDto): Promise<Category> {
+  async createCategory(
+    createCategoryDto: CreateCategoryDto,
+    file?: Express.Multer.File,
+  ): Promise<Category> {
+    if (file) {
+      const uploaded = await this.s3Service.uploadFile(file, 'categories');
+      createCategoryDto.imageUrl = uploaded.url;
+      createCategoryDto.imageKey = uploaded.key;
+    }
     const category = this.categoriesRepository.create(createCategoryDto);
     return this.categoriesRepository.save(category);
   }
 
-  async findAllCategories(paginationDto?: PaginationDto): Promise<Category[] | PaginatedResponseDto<Category>> {
+  async findAllCategories(paginationDto?: PaginationDto, bajoPedido?: boolean): Promise<Category[] | PaginatedResponseDto<Category>> {
+    const where: any = {};
+    if (bajoPedido !== undefined) {
+      where.bajoPedido = bajoPedido;
+    }
+
     if (paginationDto && (paginationDto.page || paginationDto.limit)) {
       const { page = 1, limit = 20 } = paginationDto;
       const skip = (page - 1) * limit;
 
       const [categories, total] = await this.categoriesRepository.findAndCount({
-        relations: ['subcategories'],
+        where,
+        relations: ['marcas'],
         order: { name: 'ASC' },
         skip,
         take: limit,
@@ -45,7 +61,8 @@ export class CategoriesService {
     }
 
     return this.categoriesRepository.find({
-      relations: ['subcategories'],
+      where,
+      relations: ['marcas'],
       order: { name: 'ASC' },
     });
   }
@@ -53,7 +70,7 @@ export class CategoriesService {
   async findOneCategory(id: number): Promise<Category> {
     const category = await this.categoriesRepository.findOne({
       where: { id },
-      relations: ['subcategories'],
+      relations: ['marcas'],
     });
 
     if (!category) {
@@ -63,11 +80,24 @@ export class CategoriesService {
     return category;
   }
 
-  async updateCategory(id: number, updateCategoryDto: UpdateCategoryDto): Promise<Category> {
+  async updateCategory(
+    id: number,
+    updateCategoryDto: UpdateCategoryDto,
+    file?: Express.Multer.File,
+  ): Promise<Category> {
     const category = await this.categoriesRepository.findOne({ where: { id } });
 
     if (!category) {
       throw new NotFoundException(`Category with ID ${id} not found`);
+    }
+
+    if (file) {
+      if (category.imageKey) {
+        await this.s3Service.deleteFile(category.imageKey);
+      }
+      const uploaded = await this.s3Service.uploadFile(file, 'categories');
+      updateCategoryDto.imageUrl = uploaded.url;
+      updateCategoryDto.imageKey = uploaded.key;
     }
 
     Object.assign(category, updateCategoryDto);
@@ -77,7 +107,7 @@ export class CategoriesService {
   async removeCategory(id: number): Promise<void> {
     const category = await this.categoriesRepository.findOne({
       where: { id },
-      relations: ['subcategories'],
+      relations: ['marcas'],
     });
 
     if (!category) {
@@ -87,38 +117,47 @@ export class CategoriesService {
     await this.categoriesRepository.remove(category);
   }
 
-  // Subcategory methods
-  async createSubcategory(createSubcategoryDto: CreateSubcategoryDto): Promise<Subcategory> {
+  // Marca methods
+  async createMarca(
+    createMarcaDto: CreateMarcaDto,
+    file?: Express.Multer.File,
+  ): Promise<Marca> {
     const category = await this.categoriesRepository.findOne({
-      where: { id: createSubcategoryDto.categoryId },
+      where: { id: createMarcaDto.categoryId },
     });
 
     if (!category) {
       throw new NotFoundException(
-        `Category with ID ${createSubcategoryDto.categoryId} not found`,
+        `Category with ID ${createMarcaDto.categoryId} not found`,
       );
     }
 
-    const subcategory = this.subcategoriesRepository.create(createSubcategoryDto);
-    return this.subcategoriesRepository.save(subcategory);
+    if (file) {
+      const uploaded = await this.s3Service.uploadFile(file, 'marcas');
+      createMarcaDto.imageUrl = uploaded.url;
+      createMarcaDto.imageKey = uploaded.key;
+    }
+
+    const marca = this.marcasRepository.create(createMarcaDto);
+    return this.marcasRepository.save(marca);
   }
 
-  async findAllSubcategories(): Promise<Subcategory[]> {
-    return this.subcategoriesRepository.find({
+  async findAllMarcas(): Promise<Marca[]> {
+    return this.marcasRepository.find({
       relations: ['category'],
       order: { name: 'ASC' },
     });
   }
 
-  async findSubcategoriesByCategory(
+  async findMarcasByCategory(
     categoryId: number,
     paginationDto?: PaginationDto,
-  ): Promise<Subcategory[] | PaginatedResponseDto<Subcategory>> {
+  ): Promise<Marca[] | PaginatedResponseDto<Marca>> {
     if (paginationDto && (paginationDto.page || paginationDto.limit)) {
       const { page = 1, limit = 20 } = paginationDto;
       const skip = (page - 1) * limit;
 
-      const [subcategories, total] = await this.subcategoriesRepository.findAndCount({
+      const [marcas, total] = await this.marcasRepository.findAndCount({
         where: { categoryId },
         relations: ['category'],
         order: { name: 'ASC' },
@@ -126,10 +165,10 @@ export class CategoriesService {
         take: limit,
       });
 
-      return new PaginatedResponseDto(subcategories, total, page, limit);
+      return new PaginatedResponseDto(marcas, total, page, limit);
     }
 
-    return this.subcategoriesRepository.find({
+    return this.marcasRepository.find({
       where: { categoryId },
       relations: ['category'],
       order: { name: 'ASC' },
@@ -153,8 +192,8 @@ export class CategoriesService {
     const skip = (page - 1) * limit;
 
     const [products, total] = await this.productsRepository.findAndCount({
-      where: { categoryId, parentProductId: IsNull(), isActive: true },
-      relations: ['category', 'subcategory'],
+      where: { categoryId, isActive: true },
+      relations: ['category', 'marca'],
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -165,24 +204,24 @@ export class CategoriesService {
   }
 
   /**
-   * Get products in a subcategory with pagination
+   * Get products in a marca with pagination
    */
-  async getProductsBySubcategory(
-    subcategoryId: number,
+  async getProductsByMarca(
+    marcaId: number,
     paginationDto: PaginationDto,
   ): Promise<PaginatedResponseDto<ProductResponseDto>> {
-    // Verify subcategory exists
-    const subcategory = await this.subcategoriesRepository.findOne({ where: { id: subcategoryId } });
-    if (!subcategory) {
-      throw new NotFoundException(`Subcategory with ID ${subcategoryId} not found`);
+    // Verify marca exists
+    const marca = await this.marcasRepository.findOne({ where: { id: marcaId } });
+    if (!marca) {
+      throw new NotFoundException(`Marca with ID ${marcaId} not found`);
     }
 
     const { page = 1, limit = 20 } = paginationDto;
     const skip = (page - 1) * limit;
 
     const [products, total] = await this.productsRepository.findAndCount({
-      where: { subcategoryId, parentProductId: IsNull(), isActive: true },
-      relations: ['category', 'subcategory'],
+      where: { marcaId, isActive: true },
+      relations: ['category', 'marca'],
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -192,52 +231,62 @@ export class CategoriesService {
     return new PaginatedResponseDto(data, total, page, limit);
   }
 
-  async findOneSubcategory(id: number): Promise<Subcategory> {
-    const subcategory = await this.subcategoriesRepository.findOne({
+  async findOneMarca(id: number): Promise<Marca> {
+    const marca = await this.marcasRepository.findOne({
       where: { id },
       relations: ['category'],
     });
 
-    if (!subcategory) {
-      throw new NotFoundException(`Subcategory with ID ${id} not found`);
+    if (!marca) {
+      throw new NotFoundException(`Marca with ID ${id} not found`);
     }
 
-    return subcategory;
+    return marca;
   }
 
-  async updateSubcategory(
+  async updateMarca(
     id: number,
-    updateSubcategoryDto: UpdateSubcategoryDto,
-  ): Promise<Subcategory> {
-    const subcategory = await this.subcategoriesRepository.findOne({ where: { id } });
+    updateMarcaDto: UpdateMarcaDto,
+    file?: Express.Multer.File,
+  ): Promise<Marca> {
+    const marca = await this.marcasRepository.findOne({ where: { id } });
 
-    if (!subcategory) {
-      throw new NotFoundException(`Subcategory with ID ${id} not found`);
+    if (!marca) {
+      throw new NotFoundException(`Marca with ID ${id} not found`);
     }
 
-    if (updateSubcategoryDto.categoryId) {
+    if (updateMarcaDto.categoryId) {
       const category = await this.categoriesRepository.findOne({
-        where: { id: updateSubcategoryDto.categoryId },
+        where: { id: updateMarcaDto.categoryId },
       });
 
       if (!category) {
         throw new NotFoundException(
-          `Category with ID ${updateSubcategoryDto.categoryId} not found`,
+          `Category with ID ${updateMarcaDto.categoryId} not found`,
         );
       }
     }
 
-    Object.assign(subcategory, updateSubcategoryDto);
-    return this.subcategoriesRepository.save(subcategory);
-  }
-
-  async removeSubcategory(id: number): Promise<void> {
-    const subcategory = await this.subcategoriesRepository.findOne({ where: { id } });
-
-    if (!subcategory) {
-      throw new NotFoundException(`Subcategory with ID ${id} not found`);
+    if (file) {
+      if (marca.imageKey) {
+        await this.s3Service.deleteFile(marca.imageKey);
+      }
+      const uploaded = await this.s3Service.uploadFile(file, 'marcas');
+      updateMarcaDto.imageUrl = uploaded.url;
+      updateMarcaDto.imageKey = uploaded.key;
     }
 
-    await this.subcategoriesRepository.remove(subcategory);
+    Object.assign(marca, updateMarcaDto);
+    return this.marcasRepository.save(marca);
+  }
+
+  async removeMarca(id: number): Promise<void> {
+    const marca = await this.marcasRepository.findOne({ where: { id } });
+
+    if (!marca) {
+      throw new NotFoundException(`Marca with ID ${id} not found`);
+    }
+
+    await this.marcasRepository.remove(marca);
   }
 }
