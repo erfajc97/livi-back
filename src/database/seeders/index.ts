@@ -1,17 +1,6 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
-import { CategoriesSeeder } from './categories.seeder';
-import { ProductOptionsSeeder } from './product-options.seeder';
-import { ProductsSeeder } from './products.seeder';
-import { DecantsSeeder } from './decants.seeder';
-import { ProductVariationsSeeder } from './product-variations.seeder';
 import { UsersSeeder } from './users.seeder';
-import { BannersSeeder } from './banners.seeder';
-import { CombosSeeder } from './combos.seeder';
-// import { OrdersSeeder } from './orders.seeder'; // Disabled — orders are now real
-import { FinanceSeeder } from './finance.seeder';
-import { ProductFilterFieldsSeeder } from './product-filter-fields.seeder';
-import { ProductImagesSeeder } from './product-images.seeder';
 import { entities } from '../../config/entities';
 
 // Reload environment variables to ensure fresh credentials
@@ -19,17 +8,6 @@ config();
 
 export const seeders = [
   UsersSeeder,
-  CategoriesSeeder,
-  ProductOptionsSeeder,
-  ProductsSeeder,
-  DecantsSeeder,
-  ProductVariationsSeeder,
-  ProductFilterFieldsSeeder,
-  ProductImagesSeeder,
-  BannersSeeder,
-  CombosSeeder,
-  // OrdersSeeder,
-  FinanceSeeder,
 ];
 
 export async function runSeeders() {
