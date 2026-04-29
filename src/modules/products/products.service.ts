@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Product } from './entities/product.entity';
+import { BottleEvent } from './entities/bottle-event.entity';
+import { OrderItem } from '../orders/entities/order-item.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
@@ -13,6 +15,9 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private productsRepository: Repository<Product>,
+    @InjectRepository(BottleEvent)
+    private bottleEventRepository: Repository<BottleEvent>,
+    private dataSource: DataSource,
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<ProductResponseDto> {
@@ -199,5 +204,74 @@ export class ProductsService {
     }
 
     await this.productsRepository.remove(product);
+  }
+
+  /**
+   * Get detailed inventory info for a product including bottle events and order history.
+   */
+  async getInventoryDetail(id: number) {
+    const product = await this.productsRepository.findOne({
+      where: { id },
+      relations: ['category', 'marca', 'images'],
+    });
+
+    if (!product) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+
+    const bottleEvents = await this.bottleEventRepository.find({
+      where: { productId: id },
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+
+    const orderItems = await this.dataSource
+      .getRepository(OrderItem)
+      .createQueryBuilder('oi')
+      .leftJoinAndSelect('oi.order', 'order')
+      .leftJoinAndSelect('oi.productVariation', 'variation')
+      .where('oi.productId = :id', { id })
+      .orderBy('order.createdAt', 'DESC')
+      .take(50)
+      .getMany();
+
+    const totalMl = Number(product.totalMl || 0);
+    const stock = Number(product.stock || 0);
+    const openMl = Number(product.openBottleMlRemaining || 0);
+    const availableMl = openMl + stock * totalMl;
+
+    return {
+      product: new ProductResponseDto(product),
+      inventory: {
+        stock,
+        totalMl,
+        openBottleMlRemaining: openMl,
+        availableMl,
+      },
+      bottleEvents: bottleEvents.map((e) => ({
+        id: e.id,
+        eventType: e.eventType,
+        sealedBottlesBefore: e.sealedBottlesBefore,
+        sealedBottlesAfter: e.sealedBottlesAfter,
+        openMlBefore: Number(e.openMlBefore),
+        openMlAfter: Number(e.openMlAfter),
+        note: e.note,
+        createdBy: e.createdBy,
+        createdAt: e.createdAt,
+      })),
+      orderHistory: orderItems.map((oi) => ({
+        orderId: oi.order?.id,
+        orderNumber: oi.order?.orderNumber,
+        orderStatus: oi.order?.status,
+        variationName: oi.productVariation?.name,
+        mlSize: Number(oi.productVariation?.mlSize || 0),
+        isFullBottle: oi.productVariation?.isFullBottle ?? false,
+        quantity: oi.quantity,
+        mlDeducted: Number(oi.mlDeducted || 0),
+        bottlesOpened: oi.bottlesOpened || 0,
+        price: Number(oi.price),
+        orderCreatedAt: oi.order?.createdAt,
+      })),
+    };
   }
 }

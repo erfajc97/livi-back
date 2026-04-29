@@ -42,13 +42,13 @@ export class CreateProductVariationDto {
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ description: 'Array of ProductOptionValue IDs' })
+  @ApiPropertyOptional({ description: 'Array of ProductOptionValue IDs' })
   @IsArray()
   @IsNumber({}, { each: true })
-  @IsNotEmpty()
-  optionValueIds: number[];
+  @IsOptional()
+  optionValueIds?: number[];
 
-  @ApiPropertyOptional({ description: 'Whether this variation is active', default: true })
+  @ApiPropertyOptional({ description: 'Whether this variation is active', default: true }) 
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

@@ -66,7 +66,7 @@ export class CombosService {
 
   async findAll(): Promise<Combo[]> {
     return this.comboRepository.find({
-      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.productVariation'],
+      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.product.images', 'comboProducts.productVariation', 'comboProducts.productVariation.images'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -74,7 +74,7 @@ export class CombosService {
   async findActive(): Promise<Combo[]> {
     return this.comboRepository.find({
       where: { isActive: true },
-      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.productVariation'],
+      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.product.images', 'comboProducts.productVariation', 'comboProducts.productVariation.images'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -82,7 +82,7 @@ export class CombosService {
   async findOne(id: number): Promise<Combo> {
     const combo = await this.comboRepository.findOne({
       where: { id: id as any },
-      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.productVariation'],
+      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.product.images', 'comboProducts.productVariation', 'comboProducts.productVariation.images'],
     });
     if (!combo) {
       throw new NotFoundException(`Combo with ID ${id} not found`);

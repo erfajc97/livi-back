@@ -22,7 +22,7 @@ export class ProductVariation {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;
 
-  @ManyToOne(() => Product, (product) => product.variations)
+  @ManyToOne(() => Product, (product) => product.variations, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'productId' })
   product: Product;
 

@@ -64,7 +64,19 @@ export class CreateComboDto {
   isActive?: boolean;
 
   @ApiProperty({ description: 'Products in this combo', type: [ComboProductDto] })
-  @Transform(({ value }) => (typeof value === 'string' ? JSON.parse(value) : value))
+  @Transform(({ value }) => {
+    const arr = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!Array.isArray(arr)) return arr;
+    return arr.map((item: any) => {
+      const dto = new ComboProductDto();
+      dto.productId = Number(item.productId);
+      if (item.productVariationId != null && item.productVariationId !== '') {
+        dto.productVariationId = Number(item.productVariationId);
+      }
+      dto.quantity = Number(item.quantity) || 1;
+      return dto;
+    });
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ComboProductDto)

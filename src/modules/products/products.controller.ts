@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
+import { StockService } from './stock.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
@@ -20,11 +21,15 @@ import { Public } from '../../common/decorators/public.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/constants/roles.enum';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('products')
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly stockService: StockService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -88,5 +93,52 @@ export class ProductsController {
   @ApiResponse({ status: 409, description: 'Cannot delete product with existing decants' })
   remove(@Param('id') id: string) {
     return this.productsService.remove(+id);
+  }
+
+  // ── Inventory / Stock Management ──────────────────────
+
+  @Post(':id/open-bottle')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Open a sealed bottle', description: 'Opens a sealed bottle for decanting. Decreases stock by 1, adds ml to open bottle.' })
+  @ApiParam({ name: 'id', type: 'number', description: 'Product ID' })
+  async openBottle(
+    @Param('id') id: string,
+    @Body() body: { mlRemaining?: number; note?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.stockService.openBottle(+id, {
+      mlRemaining: body.mlRemaining,
+      note: body.note,
+      createdBy: user?.email || 'admin',
+    });
+  }
+
+  @Patch(':id/adjust-ml')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Adjust open bottle ml', description: 'Manually adjust the ml remaining in the open bottle.' })
+  @ApiParam({ name: 'id', type: 'number', description: 'Product ID' })
+  async adjustMl(
+    @Param('id') id: string,
+    @Body() body: { newOpenMl: number; note?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.stockService.adjustOpenMl(+id, body.newOpenMl, {
+      note: body.note,
+      createdBy: user?.email || 'admin',
+    });
+  }
+
+  @Get(':id/inventory')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get inventory detail', description: 'Get detailed inventory info including bottle events and order history.' })
+  @ApiParam({ name: 'id', type: 'number', description: 'Product ID' })
+  async getInventory(@Param('id') id: string) {
+    return this.productsService.getInventoryDetail(+id);
   }
 }

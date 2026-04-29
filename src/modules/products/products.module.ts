@@ -24,6 +24,7 @@ import { ProductImage } from './entities/product-image.entity';
 import { ProductVideo } from './entities/product-video.entity';
 import { ProductVariationImage } from './entities/product-variation-image.entity';
 import { ProductVariationVideo } from './entities/product-variation-video.entity';
+import { BottleEvent } from './entities/bottle-event.entity';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ProductVariationVideo } from './entities/product-variation-video.entity
       ProductVideo,
       ProductVariationImage,
       ProductVariationVideo,
+      BottleEvent,
     ]),
   ],
   controllers: [

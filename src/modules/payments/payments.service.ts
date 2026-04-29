@@ -59,36 +59,61 @@ export class PaymentsService {
       let subtotal = 0;
 
       for (const item of dto.items) {
-        const variation = await this.variationsRepository.findOne({
-          where: { id: item.productVariationId },
-          relations: ['product'],
-        });
+        if (item.productVariationId) {
+          // Decant purchase — via variation
+          const variation = await this.variationsRepository.findOne({
+            where: { id: item.productVariationId },
+            relations: ['product'],
+          });
 
-        if (!variation) {
-          throw new NotFoundException(
-            `Variation ${item.productVariationId} not found`,
-          );
+          if (!variation) {
+            throw new NotFoundException(
+              `Variation ${item.productVariationId} not found`,
+            );
+          }
+
+          if (!variation.isActive || !variation.product?.isActive) {
+            throw new BadRequestException(
+              `Variation ${item.productVariationId} is not active`,
+            );
+          }
+
+          const price = Number(variation.price || variation.product.price);
+          const itemSubtotal = price * item.quantity;
+          subtotal += itemSubtotal;
+
+          orderItems.push(queryRunner.manager.create(OrderItem, {
+            productId: variation.product.id,
+            productVariationId: variation.id,
+            price,
+            quantity: item.quantity,
+            subtotal: itemSubtotal,
+          }));
+        } else if (item.productId) {
+          // Full bottle purchase — via product directly
+          const product = await this.productsRepository.findOne({
+            where: { id: item.productId },
+          });
+
+          if (!product) {
+            throw new NotFoundException(`Product ${item.productId} not found`);
+          }
+
+          if (!product.isActive) {
+            throw new BadRequestException(`Product ${item.productId} is not active`);
+          }
+
+          const price = Number(product.price);
+          const itemSubtotal = price * item.quantity;
+          subtotal += itemSubtotal;
+
+          const oi = new OrderItem();
+          oi.productId = product.id;
+          oi.price = price;
+          oi.quantity = item.quantity;
+          oi.subtotal = itemSubtotal;
+          orderItems.push(oi);
         }
-
-        if (!variation.isActive || !variation.product?.isActive) {
-          throw new BadRequestException(
-            `Variation ${item.productVariationId} is not active`,
-          );
-        }
-
-        const price = Number(variation.price || variation.product.price);
-        const itemSubtotal = price * item.quantity;
-        subtotal += itemSubtotal;
-
-        const orderItem = queryRunner.manager.create(OrderItem, {
-          productId: variation.product.id,
-          productVariationId: variation.id,
-          price,
-          quantity: item.quantity,
-          subtotal: itemSubtotal,
-        });
-
-        orderItems.push(orderItem);
       }
 
       // Calculate costs
@@ -195,33 +220,46 @@ export class PaymentsService {
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
     for (const item of order.items) {
-      if (!item.productVariationId) continue;
+      if (item.productVariationId) {
+        // Decant or variation purchase
+        const variation = await this.variationsRepository.findOne({
+          where: { id: item.productVariationId },
+          relations: ['product'],
+        });
 
-      const variation = await this.variationsRepository.findOne({
-        where: { id: item.productVariationId },
-        relations: ['product'],
-      });
+        if (!variation || !variation.product) continue;
 
-      if (!variation || !variation.product) continue;
+        if (variation.isFullBottle) {
+          await this.stockService.deductFullBottleStock(
+            variation.product,
+            item.quantity,
+            queryRunner,
+          );
+        } else {
+          const result = await this.stockService.deductDecantStock(
+            variation.product,
+            Number(variation.mlSize),
+            item.quantity,
+            queryRunner,
+          );
 
-      if (variation.isFullBottle) {
-        await this.stockService.deductFullBottleStock(
-          variation.product,
-          item.quantity,
-          queryRunner,
-        );
-      } else {
-        const result = await this.stockService.deductDecantStock(
-          variation.product,
-          Number(variation.mlSize),
-          item.quantity,
-          queryRunner,
-        );
+          item.mlDeducted = result.mlDeducted;
+          item.bottlesOpened = result.bottlesOpened;
+          await queryRunner.manager.save(OrderItem, item);
+        }
+      } else if (item.productId) {
+        // Full bottle purchase — deduct sealed stock directly
+        const product = await this.productsRepository.findOne({
+          where: { id: item.productId },
+        });
 
-        // Save deduction info on the order item for potential restoration
-        item.mlDeducted = result.mlDeducted;
-        item.bottlesOpened = result.bottlesOpened;
-        await queryRunner.manager.save(OrderItem, item);
+        if (product) {
+          await this.stockService.deductFullBottleStock(
+            product,
+            item.quantity,
+            queryRunner,
+          );
+        }
       }
     }
   }

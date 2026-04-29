@@ -48,11 +48,18 @@ export class OrderItemResponseDto {
     // Include product info if loaded
     if (item.product) {
       this.productName = item.product.name;
-      this.productImage = item.product.imageUrl;
+      this.productImage = item.product.imageUrl
+        || item.product.images?.[0]?.url
+        || null;
     }
     if (item.productVariation) {
       this.mlSize = Number(item.productVariation.mlSize);
       this.isFullBottle = item.productVariation.isFullBottle;
+      // Use variation image if available, fallback to product image
+      const variationImg = item.productVariation.images?.[0]?.url;
+      if (variationImg) {
+        this.productImage = variationImg;
+      }
     }
 
     this.createdAt = item.createdAt;

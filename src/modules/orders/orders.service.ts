@@ -296,7 +296,7 @@ export class OrdersService {
 
     const orders = await this.ordersRepository.find({
       where,
-      relations: ['items', 'items.product', 'items.productVariation', 'user'],
+      relations: ['items', 'items.product', 'items.product.images', 'items.productVariation', 'items.productVariation.images', 'user'],
       order: { createdAt: 'DESC' },
     });
 
@@ -309,7 +309,7 @@ export class OrdersService {
   async findOne(id: number, userId: number, userRole?: string): Promise<OrderResponseDto> {
     const order = await this.ordersRepository.findOne({
       where: { id },
-      relations: ['items', 'items.product', 'items.productVariation', 'user'],
+      relations: ['items', 'items.product', 'items.product.images', 'items.productVariation', 'items.productVariation.images', 'user'],
     });
 
     if (!order) {
@@ -344,32 +344,46 @@ export class OrdersService {
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
     for (const item of order.items) {
-      if (!item.productVariationId) continue;
+      if (item.productVariationId) {
+        // Decant or variation purchase
+        const variation = await this.productVariationsRepository.findOne({
+          where: { id: item.productVariationId },
+          relations: ['product'],
+        });
 
-      const variation = await this.productVariationsRepository.findOne({
-        where: { id: item.productVariationId },
-        relations: ['product'],
-      });
+        if (!variation || !variation.product) continue;
 
-      if (!variation || !variation.product) continue;
+        if (variation.isFullBottle) {
+          await this.stockService.deductFullBottleStock(
+            variation.product,
+            item.quantity,
+            queryRunner,
+          );
+        } else {
+          const result = await this.stockService.deductDecantStock(
+            variation.product,
+            Number(variation.mlSize),
+            item.quantity,
+            queryRunner,
+          );
 
-      if (variation.isFullBottle) {
-        await this.stockService.deductFullBottleStock(
-          variation.product,
-          item.quantity,
-          queryRunner,
-        );
-      } else {
-        const result = await this.stockService.deductDecantStock(
-          variation.product,
-          Number(variation.mlSize),
-          item.quantity,
-          queryRunner,
-        );
+          item.mlDeducted = result.mlDeducted;
+          item.bottlesOpened = result.bottlesOpened;
+          await queryRunner.manager.save(OrderItem, item);
+        }
+      } else if (item.productId) {
+        // Full bottle purchase — deduct sealed stock directly
+        const product = await this.productsRepository.findOne({
+          where: { id: item.productId },
+        });
 
-        item.mlDeducted = result.mlDeducted;
-        item.bottlesOpened = result.bottlesOpened;
-        await queryRunner.manager.save(OrderItem, item);
+        if (product) {
+          await this.stockService.deductFullBottleStock(
+            product,
+            item.quantity,
+            queryRunner,
+          );
+        }
       }
     }
   }
@@ -382,27 +396,40 @@ export class OrdersService {
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
     for (const item of order.items) {
-      if (!item.productVariationId) continue;
+      if (item.productVariationId) {
+        const variation = await this.productVariationsRepository.findOne({
+          where: { id: item.productVariationId },
+          relations: ['product'],
+        });
 
-      const variation = await this.productVariationsRepository.findOne({
-        where: { id: item.productVariationId },
-        relations: ['product'],
-      });
+        if (!variation || !variation.product) continue;
 
-      if (!variation || !variation.product) continue;
+        if (variation.isFullBottle) {
+          await this.stockService.restoreFullBottleStock(
+            variation.product,
+            item.quantity,
+            queryRunner,
+          );
+        } else if (item.mlDeducted && Number(item.mlDeducted) > 0) {
+          await this.stockService.restoreDecantStock(
+            variation.product,
+            Number(item.mlDeducted),
+            queryRunner,
+          );
+        }
+      } else if (item.productId) {
+        // Full bottle — restore sealed stock
+        const product = await this.productsRepository.findOne({
+          where: { id: item.productId },
+        });
 
-      if (variation.isFullBottle) {
-        await this.stockService.restoreFullBottleStock(
-          variation.product,
-          item.quantity,
-          queryRunner,
-        );
-      } else if (item.mlDeducted && Number(item.mlDeducted) > 0) {
-        await this.stockService.restoreDecantStock(
-          variation.product,
-          Number(item.mlDeducted),
-          queryRunner,
-        );
+        if (product) {
+          await this.stockService.restoreFullBottleStock(
+            product,
+            item.quantity,
+            queryRunner,
+          );
+        }
       }
     }
   }
@@ -419,7 +446,7 @@ export class OrdersService {
   ): Promise<OrderResponseDto> {
     const order = await this.ordersRepository.findOne({
       where: { id },
-      relations: ['items', 'items.product', 'items.productVariation', 'user'],
+      relations: ['items', 'items.product', 'items.product.images', 'items.productVariation', 'items.productVariation.images', 'user'],
     });
 
     if (!order) {
@@ -609,7 +636,7 @@ export class OrdersService {
     if (dto.discountAmount && dto.discountAmount > 0) {
       const savedOrder = await this.ordersRepository.findOne({
         where: { id: order.id },
-        relations: ['items', 'items.product', 'items.productVariation', 'user'],
+        relations: ['items', 'items.product', 'items.product.images', 'items.productVariation', 'items.productVariation.images', 'user'],
       });
       if (savedOrder) {
         savedOrder.total = Math.max(0, Number(savedOrder.total) - dto.discountAmount);

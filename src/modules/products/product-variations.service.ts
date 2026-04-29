@@ -29,30 +29,34 @@ export class ProductVariationsService {
       throw new NotFoundException(`Product with ID ${createVariationDto.productId} not found`);
     }
 
-    // Verify all option values exist
-    const optionValues = await this.optionValuesRepository.find({
-      where: { id: In(createVariationDto.optionValueIds) },
-      relations: ['option'],
-    });
+    let optionValues: ProductOptionValue[] = [];
 
-    if (optionValues.length !== createVariationDto.optionValueIds.length) {
-      throw new NotFoundException('One or more option values not found');
-    }
+    if (createVariationDto.optionValueIds && createVariationDto.optionValueIds.length > 0) {
+      // Verify all option values exist
+      optionValues = await this.optionValuesRepository.find({
+        where: { id: In(createVariationDto.optionValueIds) },
+        relations: ['option'],
+      });
 
-    // Check for duplicate variation (same product + same option values combination)
-    const existingVariations = await this.variationsRepository.find({
-      where: { productId: createVariationDto.productId },
-      relations: ['optionValues'],
-    });
+      if (optionValues.length !== createVariationDto.optionValueIds.length) {
+        throw new NotFoundException('One or more option values not found');
+      }
 
-    for (const existing of existingVariations) {
-      const existingValueIds = existing.optionValues.map((ov) => ov.id).sort();
-      const newValueIds = [...createVariationDto.optionValueIds].sort();
+      // Check for duplicate variation (same product + same option values combination)
+      const existingVariations = await this.variationsRepository.find({
+        where: { productId: createVariationDto.productId },
+        relations: ['optionValues'],
+      });
 
-      if (JSON.stringify(existingValueIds) === JSON.stringify(newValueIds)) {
-        throw new ConflictException(
-          'A variation with this exact combination of options already exists',
-        );
+      for (const existing of existingVariations) {
+        const existingValueIds = existing.optionValues.map((ov) => ov.id).sort();
+        const newValueIds = [...createVariationDto.optionValueIds].sort();
+
+        if (JSON.stringify(existingValueIds) === JSON.stringify(newValueIds)) {
+          throw new ConflictException(
+            'A variation with this exact combination of options already exists',
+          );
+        }
       }
     }
 
@@ -66,7 +70,9 @@ export class ProductVariationsService {
       isActive: createVariationDto.isActive ?? true,
     });
 
-    variation.optionValues = optionValues;
+    if (optionValues.length > 0) {
+      variation.optionValues = optionValues;
+    }
     const savedVariation = await this.variationsRepository.save(variation);
 
     return this.findOne(savedVariation.id);
