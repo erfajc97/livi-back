@@ -17,6 +17,11 @@ class PaymentOrderItemDto {
   @IsNumber()
   @Min(1)
   quantity: number;
+
+  @ApiPropertyOptional({ description: 'Override price (for combo items)' })
+  @IsNumber()
+  @IsOptional()
+  priceOverride?: number;
 }
 
 export class CreatePaymentDto {

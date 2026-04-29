@@ -476,8 +476,13 @@ export class OrdersService {
 
     // Determine if stock operations are needed
     const isStatusChanging = updateOrderDto.status && updateOrderDto.status !== order.status;
+    // Deduct stock when transitioning to RECEIVED or any later fulfillment state
+    // (in case admin skips RECEIVED and goes directly to SHIPPED/DELIVERED)
+    const FULFILLMENT_STATUSES = [OrderStatus.RECEIVED, OrderStatus.ACCEPTED, OrderStatus.SHIPPED, OrderStatus.DELIVERED];
     const needsStockDeduction =
-      isStatusChanging && updateOrderDto.status === OrderStatus.RECEIVED;
+      isStatusChanging &&
+      FULFILLMENT_STATUSES.includes(updateOrderDto.status as OrderStatus) &&
+      !FULFILLMENT_STATUSES.includes(order.status); // Only if not already in a fulfillment state
     const needsStockRestoration =
       isStatusChanging &&
       updateOrderDto.status === OrderStatus.CANCELLED &&
@@ -494,8 +499,8 @@ export class OrdersService {
         const now = new Date();
 
         if (needsStockDeduction) {
-          order.receivedAt = now;
-          order.status = OrderStatus.RECEIVED;
+          if (!order.receivedAt) order.receivedAt = now;
+          order.status = updateOrderDto.status as OrderStatus;
           await this.deductStockForOrder(order, queryRunner);
         } else if (needsStockRestoration) {
           order.cancelledAt = now;

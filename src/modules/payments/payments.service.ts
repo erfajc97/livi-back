@@ -78,7 +78,7 @@ export class PaymentsService {
             );
           }
 
-          const price = Number(variation.price || variation.product.price);
+          const price = item.priceOverride ?? Number(variation.price || variation.product.price);
           const itemSubtotal = price * item.quantity;
           subtotal += itemSubtotal;
 
@@ -103,7 +103,7 @@ export class PaymentsService {
             throw new BadRequestException(`Product ${item.productId} is not active`);
           }
 
-          const price = Number(product.price);
+          const price = item.priceOverride ?? Number(product.price);
           const itemSubtotal = price * item.quantity;
           subtotal += itemSubtotal;
 
