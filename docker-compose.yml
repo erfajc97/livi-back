@@ -1,0 +1,40 @@
+services:
+  api:
+    build: .
+    container_name: api-ecommerce
+    env_file: .env
+    ports:
+      - "${PORT:-4001}:${PORT:-4001}"
+    environment:
+      # Use .env value so development/staging run DB reset + migrations + seed on startup
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-4001}
+      # Override so API connects to the db service (container name)
+      DB_HOST: db
+      DB_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: api-ecommerce-db
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-postgres}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
