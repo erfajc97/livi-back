@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as sgMail from '@sendgrid/mail';
 
 interface OrderNotificationData {
   orderNumber: string;
@@ -21,10 +20,17 @@ export class OrderNotificationService {
   private readonly adminWhatsapp: string;
   private readonly fromEmail: string;
   private readonly frontendUrl: string;
+  private sgMail: any = null;
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('SENDGRID_API_KEY', '');
-    if (apiKey) sgMail.setApiKey(apiKey);
+    if (apiKey && !apiKey.includes('your-sendgrid')) {
+      try {
+        const sg = require('@sendgrid/mail');
+        sg.setApiKey(apiKey);
+        this.sgMail = sg;
+      } catch {}
+    }
 
     this.adminEmail = this.configService.get<string>('ADMIN_EMAIL', '');
     this.adminWhatsapp = this.configService.get<string>('ADMIN_WHATSAPP', '');
@@ -77,7 +83,7 @@ export class OrderNotificationService {
   }
 
   private async sendAdminEmail(data: OrderNotificationData): Promise<void> {
-    if (!this.adminEmail) return;
+    if (!this.adminEmail || !this.sgMail) return;
 
     const itemsHtml = data.items
       .map(
@@ -86,7 +92,7 @@ export class OrderNotificationService {
       )
       .join('');
 
-    await sgMail.send({
+    await this.sgMail.send({
       to: this.adminEmail,
       from: this.fromEmail,
       subject: `🛒 Nueva orden ${data.orderNumber} — $${data.total.toFixed(2)}`,
@@ -110,7 +116,7 @@ export class OrderNotificationService {
   }
 
   private async sendClientEmail(data: OrderNotificationData): Promise<void> {
-    if (!data.customerEmail) return;
+    if (!data.customerEmail || !this.sgMail) return;
 
     const itemsHtml = data.items
       .map(
@@ -119,7 +125,7 @@ export class OrderNotificationService {
       )
       .join('');
 
-    await sgMail.send({
+    await this.sgMail.send({
       to: data.customerEmail,
       from: this.fromEmail,
       subject: `Tu orden ${data.orderNumber} ha sido registrada — NönDecants`,

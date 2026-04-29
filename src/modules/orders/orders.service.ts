@@ -343,7 +343,9 @@ export class OrdersService {
     order: Order,
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
+    console.log(`[StockDeduction] Order ${order.orderNumber}: ${order.items.length} items`);
     for (const item of order.items) {
+      console.log(`[StockDeduction] Item: productId=${item.productId}, variationId=${item.productVariationId}, qty=${item.quantity}`);
       if (item.productVariationId) {
         // Decant or variation purchase
         const variation = await this.productVariationsRepository.findOne({

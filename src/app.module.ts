@@ -20,6 +20,7 @@ import { ProductTypesModule } from './modules/product-types/product-types.module
 import { LandingSectionsModule } from './modules/landing-sections/landing-sections.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -52,6 +53,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     LandingSectionsModule,
     PaymentsModule,
     SettingsModule,
+    NewsletterModule,
   ],
   providers: [
     {
