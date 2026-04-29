@@ -6,10 +6,9 @@ services:
     ports:
       - "${PORT:-4001}:${PORT:-4001}"
     environment:
-      # Use .env value so development/staging run DB reset + migrations + seed on startup
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${PORT:-4001}
-      # Override so API connects to the db service (container name)
+      # Compose service hostname (must match this service's key: `db`)
       DB_HOST: db
       DB_PORT: 5432
     depends_on:

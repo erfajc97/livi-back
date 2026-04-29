@@ -51,7 +51,7 @@ export class ProductVariation {
   optionValues: ProductOptionValue[];
 
   // Decant size in ml (e.g., 3, 5, 10) or full bottle ml
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   mlSize: number;
 
   // Whether this variation represents a full sealed bottle
