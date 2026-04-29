@@ -15,10 +15,10 @@ export class UsersSeeder extends BaseSeeder {
       return;
     }
 
-    const hashedPassword = await bcrypt.hash('admin12345', 10);
+    const hashedPassword = await bcrypt.hash('admin12345@@2026', 10);
 
     await userRepository.save({
-      email: 'nondecantsadmin@gmail.com',
+      email: 'tkfili25@gmail.com',
       password: hashedPassword,
       firstName: 'Admin',
       lastName: 'NönDecants',
@@ -28,7 +28,7 @@ export class UsersSeeder extends BaseSeeder {
     });
 
     console.log('✓ Admin user seeded');
-    console.log('  - Email: nondecantsadmin@gmail.com');
-    console.log('  - Password: admin12345');
+    console.log('  - Email: tkfili25@gmail.com');
+    console.log('  - Password: admin12345@@2026');
   }
 }

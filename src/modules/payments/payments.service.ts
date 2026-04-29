@@ -17,6 +17,7 @@ import { S3Service } from '../../common/services/s3.service';
 import { StockService } from '../products/stock.service';
 import { OrderStatusHistory } from '../orders/entities/order-status-history.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { OrderNotificationService } from '../../common/services/order-notification.service';
 
 const PAYPHONE_SURCHARGE_RATE = 0.06; // 6%
 
@@ -35,6 +36,7 @@ export class PaymentsService {
     private payPhoneService: PayPhoneService,
     private s3Service: S3Service,
     private stockService: StockService,
+    private orderNotificationService: OrderNotificationService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -165,6 +167,26 @@ export class PaymentsService {
 
       await queryRunner.commitTransaction();
 
+      // Send notifications (fire and forget)
+      const notificationData = {
+        orderNumber,
+        customerName: dto.customerName || `${user.firstName} ${user.lastName}`,
+        customerEmail: dto.customerEmail || user.email,
+        customerPhone: dto.customerPhone || '',
+        total,
+        paymentMethod: dto.paymentMethod,
+        deliveryMethod: dto.deliveryMethod,
+        shippingAddress: dto.shippingAddress,
+        shippingCity: dto.shippingCity,
+        items: orderItems.map((oi) => ({
+          name: 'Producto',
+          quantity: oi.quantity,
+          price: Number(oi.price),
+          ml: oi.productVariationId ? undefined : undefined,
+        })),
+      };
+      const notification = await this.orderNotificationService.notifyNewOrder(notificationData).catch(() => ({ whatsappUrl: '' }));
+
       // If PayPhone, create payment link (after commit so order exists regardless)
       if (isPayphone) {
         try {
@@ -199,6 +221,7 @@ export class PaymentsService {
       return {
         order: new OrderResponseDto(savedOrder),
         paymentUrl: null,
+        whatsappUrl: notification?.whatsappUrl || null,
       };
     } catch (error) {
       if (queryRunner.isTransactionActive) {
