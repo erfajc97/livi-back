@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { Repository, Between, DataSource } from 'typeorm';
 import { Transaction } from './entities/transaction.entity';
 import { Bill } from './entities/bill.entity';
+import { Order } from '../orders/entities/order.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { CreateBillDto } from './dto/create-bill.dto';
@@ -15,6 +16,7 @@ export class FinanceService {
     private transactionsRepository: Repository<Transaction>,
     @InjectRepository(Bill)
     private billsRepository: Repository<Bill>,
+    private dataSource: DataSource,
   ) {}
 
   // ── Transactions ──────────────────────────────────────
@@ -63,6 +65,28 @@ export class FinanceService {
   async updateBill(id: number, dto: UpdateBillDto): Promise<Bill> {
     const bill = await this.billsRepository.findOne({ where: { id } });
     if (!bill) throw new NotFoundException(`Bill ${id} not found`);
+
+    // REQ-A11: When marking bill as paid, auto-create expense in transactions
+    if (dto.status === 'paid' && bill.status !== 'paid') {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+
+      const expense = this.transactionsRepository.create({
+        type: 'expense' as const,
+        category: 'Cuenta por Pagar',
+        amount: Number(bill.amount),
+        date: today,
+        paymentMethod: dto.paymentMethod || bill.paymentMethod || 'Transferencia',
+        status: 'Pagado',
+        description: bill.name,
+        notes: `Pago de cuenta: ${bill.name}${bill.description ? ` — ${bill.description}` : ''}`,
+        accountName: bill.bank || undefined,
+      });
+      await this.transactionsRepository.save(expense);
+
+      bill.paidAt = now;
+    }
+
     Object.assign(bill, dto);
     return this.billsRepository.save(bill);
   }
@@ -73,7 +97,7 @@ export class FinanceService {
     await this.billsRepository.remove(bill);
   }
 
-  // ── Stats ─────────────────────────────────────────────
+  // ── Stats (REQ-A12) ──────────────────────────────────
 
   async getStats(month?: string) {
     const now = new Date();
@@ -81,7 +105,6 @@ export class FinanceService {
     let endDate: string;
 
     if (month) {
-      // month format: "2026-02"
       startDate = `${month}-01`;
       const [y, m] = month.split('-').map(Number);
       const lastDay = new Date(y, m, 0).getDate();
@@ -94,14 +117,41 @@ export class FinanceService {
       endDate = `${y}-${m}-${lastDay}`;
     }
 
+    // Finance transactions (manual income/expenses)
     const transactions = await this.transactionsRepository.find({
       where: { date: Between(startDate, endDate) },
       order: { date: 'DESC' },
     });
 
-    const totalIncome = transactions
+    // REQ-A12: Online + manual sales as income (from orders)
+    const orderRepo = this.dataSource.getRepository(Order);
+    const paidOrders = await orderRepo
+      .createQueryBuilder('order')
+      .where('order.createdAt >= :start AND order.createdAt <= :endFull', {
+        start: `${startDate}T00:00:00`,
+        endFull: `${endDate}T23:59:59`,
+      })
+      .andWhere('order.status IN (:...statuses)', {
+        statuses: ['order_received', 'order_accepted', 'order_shipped', 'order_delivered'],
+      })
+      .getMany();
+
+    const salesIncome = paidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const onlineSalesCount = paidOrders.filter(o => !o.notes?.includes('[Venta manual]')).length;
+    const manualSalesCount = paidOrders.filter(o => o.notes?.includes('[Venta manual]')).length;
+    const onlineSalesTotal = paidOrders
+      .filter(o => !o.notes?.includes('[Venta manual]'))
+      .reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const manualSalesTotal = paidOrders
+      .filter(o => o.notes?.includes('[Venta manual]'))
+      .reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+    // Manual income transactions (registered in finance module directly)
+    const manualIncome = transactions
       .filter((t) => t.type === 'income')
       .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const totalIncome = salesIncome + manualIncome;
 
     const totalExpenses = transactions
       .filter((t) => t.type === 'expense')
@@ -110,7 +160,7 @@ export class FinanceService {
     const grossProfit = totalIncome - totalExpenses;
     const profitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
 
-    // Expenses by category
+    // Expenses by category (REQ-A10: for pie chart)
     const expensesByCategory: Record<string, number> = {};
     transactions
       .filter((t) => t.type === 'expense')
@@ -118,12 +168,17 @@ export class FinanceService {
         expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + Number(t.amount);
       });
 
-    // Cash flow: group by date
+    // Cash flow: group by date (include sales)
     const cashFlowMap: Record<string, { income: number; expense: number }> = {};
     transactions.forEach((t) => {
       if (!cashFlowMap[t.date]) cashFlowMap[t.date] = { income: 0, expense: 0 };
       if (t.type === 'income') cashFlowMap[t.date].income += Number(t.amount);
       else cashFlowMap[t.date].expense += Number(t.amount);
+    });
+    paidOrders.forEach((o) => {
+      const date = new Date(o.createdAt).toISOString().split('T')[0];
+      if (!cashFlowMap[date]) cashFlowMap[date] = { income: 0, expense: 0 };
+      cashFlowMap[date].income += Number(o.total || 0);
     });
     const cashFlow = Object.entries(cashFlowMap)
       .map(([date, values]) => ({ date, ...values }))
@@ -141,19 +196,25 @@ export class FinanceService {
     const upcomingBills = pendingBills.filter(
       (b) => b.dueDate >= today && b.dueDate <= in7days,
     );
-
     const pendingTotal = pendingBills.reduce((s, b) => s + Number(b.amount), 0);
-    const expensesMonth = transactions
-      .filter((t) => t.type === 'expense')
-      .reduce((s, t) => s + Number(t.amount), 0);
 
     return {
       totalIncome,
       totalExpenses,
       grossProfit,
       profitMargin: Math.round(profitMargin * 10) / 10,
+      // Income breakdown
+      salesIncome,
+      onlineSalesCount,
+      onlineSalesTotal,
+      manualSalesCount,
+      manualSalesTotal,
+      manualIncome,
+      // Expense breakdown
       expensesByCategory,
+      // Cash flow
       cashFlow,
+      // Bills
       bills: {
         all: allBills,
         pending: pendingBills,
@@ -164,7 +225,7 @@ export class FinanceService {
         upcomingCount: upcomingBills.length,
         pendingCount: pendingBills.length,
       },
-      expensesMonth,
+      // Raw data
       transactions,
     };
   }

@@ -15,7 +15,13 @@ export class Bill {
   name: string;
 
   @Column({ nullable: true })
+  description: string;
+
+  @Column({ nullable: true })
   bank: string;
+
+  @Column({ nullable: true })
+  paymentMethod: string;
 
   @Column({ type: 'date' })
   dueDate: string;
@@ -23,8 +29,14 @@ export class Bill {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
 
+  @Column({ type: 'jsonb', nullable: true })
+  items: { description: string; amount: number }[];
+
   @Column({ default: 'pending' })
   status: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  paidAt: Date;
 
   @CreateDateColumn()
   createdAt: Date;
