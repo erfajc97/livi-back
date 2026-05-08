@@ -14,6 +14,9 @@ export class ProductResponseDto {
   @ApiProperty()
   price: number;
 
+  @ApiProperty({ description: 'Unit acquisition cost (admin)' })
+  cost: number;
+
   @ApiProperty({ required: false })
   description?: string;
 
@@ -87,6 +90,7 @@ export class ProductResponseDto {
     this.id = product.id;
     this.name = product.name;
     this.price = Number(product.price);
+    this.cost = Number(product.cost ?? 0);
     this.description = product.description;
     this.imageUrl = product.imageUrl;
     this.stock = product.stock;

@@ -47,6 +47,10 @@ export class OrderItem {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
+  // Cost snapshot at time of order (preserves COGS even if product cost changes later)
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  costSnapshot: number;
+
   // Quantity ordered
   @Column()
   quantity: number;

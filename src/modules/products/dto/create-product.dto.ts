@@ -23,6 +23,12 @@ export class CreateProductDto {
   @IsNotEmpty()
   price: number;
 
+  @ApiPropertyOptional({ example: 70.0, description: 'Unit acquisition cost (for COGS reporting)', minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  cost?: number;
+
   @ApiProperty({ example: 100, description: 'Total ml per bottle', minimum: 0 })
   @IsNumber()
   @Min(0)

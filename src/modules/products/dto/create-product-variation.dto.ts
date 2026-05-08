@@ -32,6 +32,12 @@ export class CreateProductVariationDto {
   @IsOptional()
   price?: number;
 
+  @ApiPropertyOptional({ example: 8.5, description: 'Override unit acquisition cost for this variation', minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  cost?: number;
+
   @ApiPropertyOptional({ description: 'SKU code' })
   @IsString()
   @IsOptional()

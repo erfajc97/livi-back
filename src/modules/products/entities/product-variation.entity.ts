@@ -33,6 +33,10 @@ export class ProductVariation {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   price: number;
 
+  // Variation-specific acquisition cost (overrides base product cost if set)
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  cost: number;
+
   // SKU for this specific variation
   @Column({ nullable: true, unique: true })
   sku: string;

@@ -18,6 +18,9 @@ export class ProductVariationResponseDto {
   @ApiProperty({ required: false })
   price?: number;
 
+  @ApiProperty({ required: false, description: 'Override unit acquisition cost (admin)' })
+  cost?: number;
+
   @ApiProperty({ required: false })
   sku?: string;
 
@@ -59,6 +62,7 @@ export class ProductVariationResponseDto {
     this.mlSize = Number(variation.mlSize || 0);
     this.isFullBottle = variation.isFullBottle ?? false;
     this.price = variation.price;
+    this.cost = variation.cost ?? undefined;
     this.sku = variation.sku;
     this.name = variation.name;
     this.isActive = variation.isActive;

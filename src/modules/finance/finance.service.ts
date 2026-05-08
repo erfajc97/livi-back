@@ -124,6 +124,9 @@ export class FinanceService {
     });
 
     // REQ-A12: Online + manual sales as income (from orders)
+    // Only count orders with confirmed payment (paymentStatus != 'pending').
+    // Legacy rows with NULL paymentStatus are still included to avoid losing
+    // historical data prior to the strict payment-tracking rollout.
     const orderRepo = this.dataSource.getRepository(Order);
     const paidOrders = await orderRepo
       .createQueryBuilder('order')
@@ -134,6 +137,9 @@ export class FinanceService {
       .andWhere('order.status IN (:...statuses)', {
         statuses: ['order_received', 'order_accepted', 'order_shipped', 'order_delivered'],
       })
+      .andWhere(
+        "(order.paymentStatus IS NULL OR order.paymentStatus NOT IN ('pending', 'failed', 'refunded'))",
+      )
       .getMany();
 
     const salesIncome = paidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);

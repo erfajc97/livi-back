@@ -55,6 +55,10 @@ export class Product {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
+  // Unit acquisition cost (used for COGS auto-expense on order fulfillment)
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  cost: number;
+
   @Column({ nullable: true })
   description: string;
 

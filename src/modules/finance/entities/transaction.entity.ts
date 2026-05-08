@@ -40,6 +40,14 @@ export class Transaction {
   @Column({ nullable: true })
   accountName: string;
 
+  // Source linkage for auto-generated transactions (e.g. order COGS, payphone fee, bill payment)
+  // Used to compensate / delete on order cancellation.
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  referenceType: string | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  referenceId: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -10,6 +10,7 @@ import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Product } from '../products/entities/product.entity';
 import { ProductVariation } from '../products/entities/product-variation.entity';
+import { Transaction } from '../finance/entities/transaction.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -32,10 +33,18 @@ export class OrdersService {
     private productVariationsRepository: Repository<ProductVariation>,
     @InjectRepository(OrderStatusHistory)
     private statusHistoryRepository: Repository<OrderStatusHistory>,
+    @InjectRepository(Transaction)
+    private transactionsRepository: Repository<Transaction>,
     private dataSource: DataSource,
     private cartService: CartService,
     private stockService: StockService,
   ) {}
+
+  private resolveItemCost(product: Product | null, variation: ProductVariation | null): number {
+    const variationCost = variation?.cost != null ? Number(variation.cost) : null;
+    if (variationCost && variationCost > 0) return variationCost;
+    return Number(product?.cost ?? 0);
+  }
 
   /**
    * Record a status change in history
@@ -193,9 +202,12 @@ export class OrdersService {
         const subtotal = Number(price) * itemDto.quantity;
         total += subtotal;
 
+        const costSnapshot = this.resolveItemCost(product, productVariation);
+
         // Create order item with proper handling of nullable fields
         const orderItemData: any = {
           price: Number(price),
+          costSnapshot,
           quantity: itemDto.quantity,
           subtotal,
         };
@@ -335,6 +347,90 @@ export class OrdersService {
     OrderStatus.DELIVERED,
     OrderStatus.DELAYED,
   ];
+
+  /**
+   * Create finance Transaction rows linked to an order when it transitions
+   * into a fulfillment status for the first time:
+   *  - COGS expense (sum of item.costSnapshot * quantity)
+   *  - Payphone fee expense (when surcharge > 0)
+   * Idempotent: skips creation if a transaction with the same referenceType
+   * and orderId already exists.
+   */
+  private async createCogsTransactionsForOrder(
+    order: Order,
+    queryRunner: import('typeorm').QueryRunner,
+    now: Date,
+  ): Promise<void> {
+    const txRepo = queryRunner.manager.getRepository(Transaction);
+    const today = now.toISOString().split('T')[0];
+
+    const cogsTotal = (order.items || []).reduce((sum, item) => {
+      const unitCost = Number(item.costSnapshot ?? 0);
+      const qty = Number(item.quantity ?? 0);
+      return sum + unitCost * qty;
+    }, 0);
+
+    if (cogsTotal > 0) {
+      const existing = await txRepo.findOne({
+        where: { referenceType: 'order_cogs', referenceId: order.id },
+      });
+      if (!existing) {
+        await txRepo.save(
+          txRepo.create({
+            type: 'expense',
+            category: 'Costo de mercadería',
+            amount: cogsTotal,
+            date: today,
+            paymentMethod: order.paymentMethod || 'Inventario',
+            status: 'Pagado',
+            description: `COGS orden ${order.orderNumber}`,
+            notes: `Costo automático de productos vendidos en la orden ${order.orderNumber}`,
+            referenceType: 'order_cogs',
+            referenceId: order.id,
+          }),
+        );
+      }
+    }
+
+    const payphoneFee = Number(order.payphoneSurcharge ?? 0);
+    if (payphoneFee > 0) {
+      const existing = await txRepo.findOne({
+        where: { referenceType: 'order_payphone_fee', referenceId: order.id },
+      });
+      if (!existing) {
+        await txRepo.save(
+          txRepo.create({
+            type: 'expense',
+            category: 'Comisión Payphone',
+            amount: payphoneFee,
+            date: today,
+            paymentMethod: 'Payphone',
+            status: 'Pagado',
+            description: `Recargo Payphone orden ${order.orderNumber}`,
+            notes: `Comisión 6% Payphone aplicada a la orden ${order.orderNumber}`,
+            referenceType: 'order_payphone_fee',
+            referenceId: order.id,
+          }),
+        );
+      }
+    }
+  }
+
+  /**
+   * Remove finance Transaction rows linked to an order. Used on cancellation
+   * after stock has been restored, so reports reflect that the sale never
+   * generated COGS or fees.
+   */
+  private async removeOrderTransactions(
+    orderId: number,
+    queryRunner: import('typeorm').QueryRunner,
+  ): Promise<void> {
+    const txRepo = queryRunner.manager.getRepository(Transaction);
+    await txRepo.delete([
+      { referenceType: 'order_cogs', referenceId: orderId },
+      { referenceType: 'order_payphone_fee', referenceId: orderId },
+    ]);
+  }
 
   /**
    * Deduct stock for all items in an order using a transaction.
@@ -504,10 +600,12 @@ export class OrdersService {
           if (!order.receivedAt) order.receivedAt = now;
           order.status = updateOrderDto.status as OrderStatus;
           await this.deductStockForOrder(order, queryRunner);
+          await this.createCogsTransactionsForOrder(order, queryRunner, now);
         } else if (needsStockRestoration) {
           order.cancelledAt = now;
           order.status = OrderStatus.CANCELLED;
           await this.restoreStockForOrder(order, queryRunner);
+          await this.removeOrderTransactions(order.id, queryRunner);
         }
 
         // Apply other field updates
