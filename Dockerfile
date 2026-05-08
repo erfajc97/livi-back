@@ -24,7 +24,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies only
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
@@ -35,16 +35,15 @@ RUN addgroup -g 1001 -S nodejs && \
 
 USER nodejs
 
-# Expose port
-EXPOSE 3030
+# Default port (override at runtime, e.g. docker compose / .env PORT=4001)
+EXPOSE 4001
 
-# Environment variables (can be overridden at runtime)
 ENV NODE_ENV=production
-ENV PORT=3030
+ENV PORT=4001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3030/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" || exit 1
+# Public GET /api/settings (JwtAuthGuard skips @Public routes). Honors PORT at runtime.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD ["node","-e","require('http').get('http://127.0.0.1:'+(process.env.PORT||4001)+'/api/settings',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 
 # Start application
 CMD ["node", "dist/main"]

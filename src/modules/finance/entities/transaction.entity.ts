@@ -19,7 +19,7 @@ export class Transaction {
   @Column()
   category: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   amount: number;
 
   @Column({ type: 'date' })

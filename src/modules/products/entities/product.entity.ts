@@ -52,7 +52,7 @@ export class Product {
   @Column()
   name: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   price: number;
 
   // Unit acquisition cost (used for COGS auto-expense on order fulfillment)
@@ -99,7 +99,7 @@ export class Product {
   benefits: string;
 
   // Total ml per bottle (e.g., 100ml)
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   totalMl: number;
 
   // Remaining ml from the currently opened bottle for decanting

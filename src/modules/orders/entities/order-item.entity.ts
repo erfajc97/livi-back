@@ -44,7 +44,7 @@ export class OrderItem {
   productVariationId: number;
 
   // Price snapshot at time of order (to preserve historical pricing)
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   price: number;
 
   // Cost snapshot at time of order (preserves COGS even if product cost changes later)
@@ -56,7 +56,7 @@ export class OrderItem {
   quantity: number;
 
   // Subtotal for this item (price * quantity)
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   subtotal: number;
 
   // Total ml deducted from open bottle (for decant orders, used in cancellation restoration)
