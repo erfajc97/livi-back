@@ -21,6 +21,7 @@ import { Combo } from '../modules/combos/entities/combo.entity';
 import { ComboProduct } from '../modules/combos/entities/combo-product.entity';
 import { Transaction } from '../modules/finance/entities/transaction.entity';
 import { Bill } from '../modules/finance/entities/bill.entity';
+import { PaymentMethod } from '../modules/finance/entities/payment-method.entity';
 import { ProductTypeEntity } from '../modules/product-types/entities/product-type.entity';
 import { BlogPost } from '../modules/blog/entities/blog-post.entity';
 import { Coupon } from '../modules/coupons/entities/coupon.entity';
@@ -53,6 +54,7 @@ export const entities = [
   ComboProduct,
   Transaction,
   Bill,
+  PaymentMethod,
   ProductTypeEntity,
   BlogPost,
   Coupon,

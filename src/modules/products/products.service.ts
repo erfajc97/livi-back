@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Product } from './entities/product.entity';
+import { ProductVariation } from './entities/product-variation.entity';
 import { BottleEvent } from './entities/bottle-event.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -15,6 +16,8 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private productsRepository: Repository<Product>,
+    @InjectRepository(ProductVariation)
+    private variationsRepository: Repository<ProductVariation>,
     @InjectRepository(BottleEvent)
     private bottleEventRepository: Repository<BottleEvent>,
     private dataSource: DataSource,
@@ -24,7 +27,57 @@ export class ProductsService {
     const product = this.productsRepository.create(createProductDto);
     const savedProduct = await this.productsRepository.save(product);
 
+    // Ensure every product has at least one full-bottle variation so manual
+    // sales and orders always have a canonical sellable unit for the bottle.
+    await this.ensureFullBottleVariation(savedProduct);
+
     return this.findOne(savedProduct.id);
+  }
+
+  /**
+   * Create a full-bottle ProductVariation if the product doesn't have one yet.
+   * Uses the product's totalMl / price as defaults.
+   */
+  private async ensureFullBottleVariation(product: Product): Promise<void> {
+    const existing = await this.variationsRepository.findOne({
+      where: { productId: product.id, isFullBottle: true },
+    });
+
+    if (existing) return;
+
+    const totalMl = Number(product.totalMl) || 100;
+    const sku = `${(product.name || 'product').toString().replace(/\s+/g, '-').toLowerCase().slice(0, 40)}-bottle-${product.id}`;
+
+    const variation = this.variationsRepository.create({
+      productId: product.id,
+      isFullBottle: true,
+      mlSize: totalMl,
+      price: product.price,
+      name: `${product.name} - Botella ${totalMl}ml`,
+      sku,
+      isActive: true,
+    });
+
+    await this.variationsRepository.save(variation);
+  }
+
+  /**
+   * Keep the auto-managed full-bottle variation in sync with product price/totalMl.
+   */
+  private async syncFullBottleVariation(product: Product): Promise<void> {
+    const variation = await this.variationsRepository.findOne({
+      where: { productId: product.id, isFullBottle: true },
+    });
+
+    if (!variation) {
+      await this.ensureFullBottleVariation(product);
+      return;
+    }
+
+    const totalMl = Number(product.totalMl) || Number(variation.mlSize) || 100;
+    variation.mlSize = totalMl;
+    variation.price = product.price;
+    await this.variationsRepository.save(variation);
   }
 
   async findAll(): Promise<ProductResponseDto[]> {
@@ -188,8 +241,19 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    Object.assign(product, updateProductDto);
+    // Filter undefined keys so partial updates never overwrite stored values
+    // with undefined (which TypeORM persists as NULL).
+    const sanitized = Object.fromEntries(
+      Object.entries(updateProductDto).filter(([, value]) => value !== undefined),
+    ) as Partial<UpdateProductDto>;
+
+    Object.assign(product, sanitized);
     const updatedProduct = await this.productsRepository.save(product);
+
+    // Keep full-bottle variation aligned with product price / totalMl
+    if (sanitized.price !== undefined || sanitized.totalMl !== undefined) {
+      await this.syncFullBottleVariation(updatedProduct);
+    }
 
     return this.findOne(updatedProduct.id);
   }
@@ -212,7 +276,7 @@ export class ProductsService {
   async getInventoryDetail(id: number) {
     const product = await this.productsRepository.findOne({
       where: { id },
-      relations: ['category', 'marca', 'images'],
+      relations: ['category', 'marca', 'images', 'variations'],
     });
 
     if (!product) {
@@ -241,13 +305,21 @@ export class ProductsService {
     const availableMl = openMl + stock * totalMl;
 
     return {
-      product: new ProductResponseDto(product),
+      product: new ProductResponseDto(product, true),
       inventory: {
         stock,
         totalMl,
         openBottleMlRemaining: openMl,
         availableMl,
       },
+      variations: (product.variations ?? []).map((v) => ({
+        id: v.id,
+        name: v.name,
+        mlSize: Number(v.mlSize),
+        price: Number(v.price ?? product.price),
+        isFullBottle: v.isFullBottle,
+        isActive: v.isActive,
+      })),
       bottleEvents: bottleEvents.map((e) => ({
         id: e.id,
         eventType: e.eventType,

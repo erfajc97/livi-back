@@ -65,6 +65,20 @@ export class PaymentsController {
     );
   }
 
+  @Post('admin/reconcile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Reconcile pending PayPhone payments',
+    description:
+      'Confirms PayPhone orders that are still pending. Useful when the customer closed the browser before being redirected back. Safe to run multiple times — idempotent.',
+  })
+  @ApiResponse({ status: 200, description: 'Reconciliation summary' })
+  async reconcilePending() {
+    return this.paymentsService.reconcilePendingPayphoneOrders();
+  }
+
   @Post(':orderId/upload-receipt')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')

@@ -150,7 +150,8 @@ export class OrdersService {
           productId = product.id;
           productVariationId = productVariation.id;
         } else if (itemDto.productId) {
-          // Ordering base product
+          // Ordering base product — auto-resolve to the canonical full-bottle
+          // variation when available so we have a single sellable unit.
           product = await this.productsRepository.findOne({
             where: { id: itemDto.productId },
             relations: ['variations'],
@@ -166,27 +167,30 @@ export class OrdersService {
             );
           }
 
-          // Check if product has variations - if it does, user must order a variation
           const activeVariations = product.variations?.filter((v) => v.isActive) || [];
-          if (activeVariations.length > 0) {
+          const fullBottleVariation = activeVariations.find((v) => v.isFullBottle);
+
+          if (fullBottleVariation) {
+            // Treat productId-only as full-bottle sale through the variation
+            price = Number(fullBottleVariation.price || product.price);
+            productId = product.id;
+            productVariationId = fullBottleVariation.id;
+            productVariation = fullBottleVariation;
+          } else if (activeVariations.length > 0) {
+            // Product has only decant variations — caller must specify one
             throw new BadRequestException(
               `Product with ID ${itemDto.productId} has variations. You must order a specific variation instead of the base product. Available variations: ${activeVariations.map((v) => v.id).join(', ')}`,
             );
+          } else {
+            // No variations at all — legacy path, sell the base product
+            if (!product.bajoPedido && product.stock < itemDto.quantity) {
+              throw new BadRequestException(
+                `Insufficient stock for product ${itemDto.productId}. Available: ${product.stock}, Requested: ${itemDto.quantity}`,
+              );
+            }
+            price = product.price;
+            productId = product.id;
           }
-
-          // Check stock
-          if (product.stock < itemDto.quantity) {
-            throw new BadRequestException(
-              `Insufficient stock for product ${itemDto.productId}. Available: ${product.stock}, Requested: ${itemDto.quantity}`,
-            );
-          }
-
-          price = product.price;
-          productId = product.id;
-
-          // Update stock
-          product.stock -= itemDto.quantity;
-          await queryRunner.manager.save(Product, product);
         } else {
           // This should never happen due to validation, but TypeScript needs this
           throw new BadRequestException(
@@ -434,16 +438,21 @@ export class OrdersService {
 
   /**
    * Deduct stock for all items in an order using a transaction.
+   * Idempotent: items with stockDeductedAt already set are skipped.
    */
   private async deductStockForOrder(
     order: Order,
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
     console.log(`[StockDeduction] Order ${order.orderNumber}: ${order.items.length} items`);
+    const now = new Date();
     for (const item of order.items) {
+      if (item.stockDeductedAt) {
+        console.log(`[StockDeduction] Item ${item.id} already deducted at ${item.stockDeductedAt} — skipping`);
+        continue;
+      }
       console.log(`[StockDeduction] Item: productId=${item.productId}, variationId=${item.productVariationId}, qty=${item.quantity}`);
       if (item.productVariationId) {
-        // Decant or variation purchase
         const variation = await this.productVariationsRepository.findOne({
           where: { id: item.productVariationId },
           relations: ['product'],
@@ -452,11 +461,12 @@ export class OrdersService {
         if (!variation || !variation.product) continue;
 
         if (variation.isFullBottle) {
-          await this.stockService.deductFullBottleStock(
+          const result = await this.stockService.deductFullBottleStock(
             variation.product,
             item.quantity,
             queryRunner,
           );
+          item.bajoPedidoQuantity = result.pendingQuantity;
         } else {
           const result = await this.stockService.deductDecantStock(
             variation.product,
@@ -464,25 +474,26 @@ export class OrdersService {
             item.quantity,
             queryRunner,
           );
-
           item.mlDeducted = result.mlDeducted;
           item.bottlesOpened = result.bottlesOpened;
-          await queryRunner.manager.save(OrderItem, item);
+          item.bajoPedidoQuantity = result.pendingQuantity;
         }
       } else if (item.productId) {
-        // Full bottle purchase — deduct sealed stock directly
         const product = await this.productsRepository.findOne({
           where: { id: item.productId },
         });
 
         if (product) {
-          await this.stockService.deductFullBottleStock(
+          const result = await this.stockService.deductFullBottleStock(
             product,
             item.quantity,
             queryRunner,
           );
+          item.bajoPedidoQuantity = result.pendingQuantity;
         }
       }
+      item.stockDeductedAt = now;
+      await queryRunner.manager.save(OrderItem, item);
     }
   }
 
@@ -599,6 +610,11 @@ export class OrdersService {
         if (needsStockDeduction) {
           if (!order.receivedAt) order.receivedAt = now;
           order.status = updateOrderDto.status as OrderStatus;
+          // Admin moving an order into fulfillment confirms payment too —
+          // mark as paid so finance / dashboard count the revenue.
+          if (!order.paymentStatus || order.paymentStatus === 'pending' || order.paymentStatus === 'receipt_uploaded') {
+            order.paymentStatus = 'paid';
+          }
           await this.deductStockForOrder(order, queryRunner);
           await this.createCogsTransactionsForOrder(order, queryRunner, now);
         } else if (needsStockRestoration) {
@@ -721,10 +737,11 @@ export class OrdersService {
   }
 
   /**
-   * Create a manual order on behalf of a client (admin only)
+   * Create a manual order on behalf of a client (admin only).
+   * Manual sales are finalized immediately: paid, delivered, stock deducted,
+   * COGS recorded. No customer-facing notifications are sent.
    */
   async createManualOrder(dto: CreateManualOrderDto): Promise<OrderResponseDto> {
-    // Fetch user's saved address for the order
     const user = await this.dataSource.getRepository('User').findOneBy({ id: dto.userId });
 
     const orderDto: CreateOrderDto = {
@@ -735,21 +752,57 @@ export class OrdersService {
       notes: dto.notes || '[Venta manual]',
     };
 
-    const order = await this.create(orderDto, dto.userId);
+    const created = await this.create(orderDto, dto.userId);
 
-    // Apply discount if provided
+    // Apply discount before finalizing so the recorded total reflects what was charged
     if (dto.discountAmount && dto.discountAmount > 0) {
-      const savedOrder = await this.ordersRepository.findOne({
-        where: { id: order.id },
-        relations: ['items', 'items.product', 'items.product.images', 'items.productVariation', 'items.productVariation.images', 'user'],
-      });
-      if (savedOrder) {
-        savedOrder.total = Math.max(0, Number(savedOrder.total) - dto.discountAmount);
-        await this.ordersRepository.save(savedOrder);
-        return new OrderResponseDto(savedOrder);
+      const order = await this.ordersRepository.findOne({ where: { id: created.id } });
+      if (order) {
+        order.total = Math.max(0, Number(order.total) - dto.discountAmount);
+        await this.ordersRepository.save(order);
       }
     }
 
-    return order;
+    await this.finalizeManualSale(created.id);
+
+    return this.findOne(created.id, dto.userId);
+  }
+
+  /**
+   * Mark a manual sale as paid + delivered, deduct stock, and create COGS
+   * transactions atomically. Skips customer notifications by design.
+   */
+  private async finalizeManualSale(orderId: number): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const order = await queryRunner.manager.findOne(Order, {
+        where: { id: orderId },
+        relations: ['items', 'items.product', 'items.productVariation'],
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order ${orderId} not found`);
+      }
+
+      const now = new Date();
+      order.paymentStatus = 'paid';
+      order.status = OrderStatus.DELIVERED;
+      order.receivedAt = order.receivedAt ?? now;
+      order.deliveredAt = now;
+
+      await this.deductStockForOrder(order, queryRunner);
+      await this.createCogsTransactionsForOrder(order, queryRunner, now);
+
+      await queryRunner.manager.save(Order, order);
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

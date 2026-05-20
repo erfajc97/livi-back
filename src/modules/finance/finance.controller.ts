@@ -15,6 +15,8 @@ import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { CreateBillDto } from './dto/create-bill.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
+import { CreatePaymentMethodDto } from './dto/create-payment-method.dto';
+import { UpdatePaymentMethodDto } from './dto/update-payment-method.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -86,5 +88,31 @@ export class FinanceController {
   @ApiOperation({ summary: 'Delete a bill' })
   removeBill(@Param('id') id: string) {
     return this.financeService.removeBill(+id);
+  }
+
+  // ── Payment Methods ───────────────────────────────────
+
+  @Get('payment-methods')
+  @ApiOperation({ summary: 'List all payment methods' })
+  findAllPaymentMethods() {
+    return this.financeService.findAllPaymentMethods();
+  }
+
+  @Post('payment-methods')
+  @ApiOperation({ summary: 'Create a payment method' })
+  createPaymentMethod(@Body() dto: CreatePaymentMethodDto) {
+    return this.financeService.createPaymentMethod(dto);
+  }
+
+  @Patch('payment-methods/:id')
+  @ApiOperation({ summary: 'Update a payment method' })
+  updatePaymentMethod(@Param('id') id: string, @Body() dto: UpdatePaymentMethodDto) {
+    return this.financeService.updatePaymentMethod(+id, dto);
+  }
+
+  @Delete('payment-methods/:id')
+  @ApiOperation({ summary: 'Delete a payment method' })
+  removePaymentMethod(@Param('id') id: string) {
+    return this.financeService.removePaymentMethod(+id);
   }
 }

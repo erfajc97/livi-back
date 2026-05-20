@@ -36,6 +36,8 @@ export class StockService {
 
   /**
    * Deduct ml for decant orders. Opens sealed bottles as needed.
+   * Never throws on insufficient stock — any shortfall is returned as
+   * `pendingQuantity` so caller can tag those units as bajo pedido.
    * Uses pessimistic_write lock on the product row.
    */
   async deductDecantStock(
@@ -43,8 +45,7 @@ export class StockService {
     mlSize: number,
     quantity: number,
     queryRunner: QueryRunner,
-  ): Promise<{ mlDeducted: number; bottlesOpened: number }> {
-    // Re-load product with pessimistic lock
+  ): Promise<{ mlDeducted: number; bottlesOpened: number; pendingQuantity: number }> {
     const lockedProduct = await queryRunner.manager.findOne(Product, {
       where: { id: product.id },
       lock: { mode: 'pessimistic_write' },
@@ -54,63 +55,63 @@ export class StockService {
       throw new BadRequestException('Producto no encontrado');
     }
 
-    const totalMlNeeded = mlSize * quantity;
+    const totalMl = Number(lockedProduct.totalMl) || 0;
     const openMl = Number(lockedProduct.openBottleMlRemaining || 0);
-    const totalMl = Number(lockedProduct.totalMl);
+    const availableMl = openMl + lockedProduct.stock * totalMl;
+    const totalMlRequested = mlSize * quantity;
+
+    // Cap deduction to what's physically available; the rest is back-ordered.
+    const mlToDeduct = Math.min(totalMlRequested, availableMl);
+    const unitsFulfilled = mlSize > 0 ? Math.floor(mlToDeduct / mlSize) : quantity;
+    const pendingQuantity = Math.max(0, quantity - unitsFulfilled);
+    const mlActuallyDeducted = unitsFulfilled * mlSize;
     let bottlesOpened = 0;
 
-    if (openMl >= totalMlNeeded) {
-      // Enough ml in the open bottle
-      lockedProduct.openBottleMlRemaining = openMl - totalMlNeeded;
-    } else {
-      // Need to open sealed bottles
-      const remaining = totalMlNeeded - openMl;
-      const bottlesNeeded = Math.ceil(remaining / totalMl);
-
-      if (lockedProduct.stock < bottlesNeeded) {
-        throw new BadRequestException(
-          `Stock insuficiente. Necesita ${bottlesNeeded} botella(s) pero solo hay ${lockedProduct.stock}`,
-        );
+    if (mlActuallyDeducted > 0) {
+      if (openMl >= mlActuallyDeducted) {
+        lockedProduct.openBottleMlRemaining = openMl - mlActuallyDeducted;
+      } else {
+        const remaining = mlActuallyDeducted - openMl;
+        const bottlesNeeded = totalMl > 0 ? Math.ceil(remaining / totalMl) : 0;
+        lockedProduct.stock = Math.max(0, lockedProduct.stock - bottlesNeeded);
+        const totalNewMl = bottlesNeeded * totalMl;
+        lockedProduct.openBottleMlRemaining = openMl + totalNewMl - mlActuallyDeducted;
+        bottlesOpened = bottlesNeeded;
       }
 
-      lockedProduct.stock -= bottlesNeeded;
-      const totalNewMl = bottlesNeeded * totalMl;
-      lockedProduct.openBottleMlRemaining = openMl + totalNewMl - totalMlNeeded;
-      bottlesOpened = bottlesNeeded;
+      await queryRunner.manager.save(Product, lockedProduct);
+
+      if (bottlesOpened > 0) {
+        const event = new BottleEvent();
+        event.productId = product.id;
+        event.eventType = BottleEventType.BOTTLE_OPENED;
+        event.sealedBottlesBefore = lockedProduct.stock + bottlesOpened;
+        event.sealedBottlesAfter = lockedProduct.stock;
+        event.openMlBefore = openMl;
+        event.openMlAfter = Number(lockedProduct.openBottleMlRemaining);
+        event.note = `Apertura automática por orden (${mlActuallyDeducted}ml deducidos)`;
+        event.createdBy = 'sistema';
+        await queryRunner.manager.save(BottleEvent, event);
+      }
     }
 
-    await queryRunner.manager.save(Product, lockedProduct);
-
-    // Log bottle event if bottles were opened
-    if (bottlesOpened > 0) {
-      const event = new BottleEvent();
-      event.productId = product.id;
-      event.eventType = BottleEventType.BOTTLE_OPENED;
-      event.sealedBottlesBefore = lockedProduct.stock + bottlesOpened;
-      event.sealedBottlesAfter = lockedProduct.stock;
-      event.openMlBefore = openMl;
-      event.openMlAfter = Number(lockedProduct.openBottleMlRemaining);
-      event.note = `Apertura automática por orden (${totalMlNeeded}ml solicitados)`;
-      event.createdBy = 'sistema';
-      await queryRunner.manager.save(BottleEvent, event);
-    }
-
-    // Sync the passed product reference
     product.stock = lockedProduct.stock;
     product.openBottleMlRemaining = lockedProduct.openBottleMlRemaining;
 
-    return { mlDeducted: totalMlNeeded, bottlesOpened };
+    return { mlDeducted: mlActuallyDeducted, bottlesOpened, pendingQuantity };
   }
 
   /**
    * Deduct sealed bottles for full bottle orders.
+   * Never throws on insufficient stock — any shortfall is returned as
+   * `pendingQuantity` so caller can tag those units as bajo pedido.
    * Uses pessimistic_write lock on the product row.
    */
   async deductFullBottleStock(
     product: Product,
     quantity: number,
     queryRunner: QueryRunner,
-  ): Promise<void> {
+  ): Promise<{ pendingQuantity: number }> {
     const lockedProduct = await queryRunner.manager.findOne(Product, {
       where: { id: product.id },
       lock: { mode: 'pessimistic_write' },
@@ -120,17 +121,16 @@ export class StockService {
       throw new BadRequestException('Producto no encontrado');
     }
 
-    if (lockedProduct.stock < quantity) {
-      throw new BadRequestException(
-        `Stock insuficiente. Necesita ${quantity} botella(s) pero solo hay ${lockedProduct.stock}`,
-      );
+    const fulfilled = Math.min(quantity, Math.max(0, lockedProduct.stock));
+    const pendingQuantity = quantity - fulfilled;
+
+    if (fulfilled > 0) {
+      lockedProduct.stock -= fulfilled;
+      await queryRunner.manager.save(Product, lockedProduct);
     }
 
-    lockedProduct.stock -= quantity;
-    await queryRunner.manager.save(Product, lockedProduct);
-
-    // Sync the passed product reference
     product.stock = lockedProduct.stock;
+    return { pendingQuantity };
   }
 
   /**

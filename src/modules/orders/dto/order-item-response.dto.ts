@@ -37,6 +37,9 @@ export class OrderItemResponseDto {
   @ApiPropertyOptional({ description: 'Is full bottle' })
   isFullBottle?: boolean;
 
+  @ApiPropertyOptional({ example: 0, description: 'Quantity back-ordered (bajo pedido) due to stock shortage' })
+  bajoPedidoQuantity?: number;
+
   constructor(item: any) {
     this.id = item.id;
     this.productId = item.productId;
@@ -44,6 +47,7 @@ export class OrderItemResponseDto {
     this.price = Number(item.price);
     this.quantity = item.quantity;
     this.subtotal = Number(item.subtotal);
+    this.bajoPedidoQuantity = Number(item.bajoPedidoQuantity ?? 0);
 
     // Include product info if loaded
     if (item.product) {

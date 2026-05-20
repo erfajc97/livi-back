@@ -235,16 +235,17 @@ export class PaymentsService {
 
   /**
    * Deduct stock for all items in an order using a transaction.
-   * For each item with a variation: full bottles deduct sealed stock,
-   * decants deduct ml from open/sealed bottles.
+   * Idempotent via OrderItem.stockDeductedAt — items already deducted are skipped.
    */
   private async deductStockForOrder(
     order: Order,
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
+    const now = new Date();
     for (const item of order.items) {
+      if (item.stockDeductedAt) continue;
+
       if (item.productVariationId) {
-        // Decant or variation purchase
         const variation = await this.variationsRepository.findOne({
           where: { id: item.productVariationId },
           relations: ['product'],
@@ -253,11 +254,12 @@ export class PaymentsService {
         if (!variation || !variation.product) continue;
 
         if (variation.isFullBottle) {
-          await this.stockService.deductFullBottleStock(
+          const result = await this.stockService.deductFullBottleStock(
             variation.product,
             item.quantity,
             queryRunner,
           );
+          item.bajoPedidoQuantity = result.pendingQuantity;
         } else {
           const result = await this.stockService.deductDecantStock(
             variation.product,
@@ -265,36 +267,38 @@ export class PaymentsService {
             item.quantity,
             queryRunner,
           );
-
           item.mlDeducted = result.mlDeducted;
           item.bottlesOpened = result.bottlesOpened;
-          await queryRunner.manager.save(OrderItem, item);
+          item.bajoPedidoQuantity = result.pendingQuantity;
         }
       } else if (item.productId) {
-        // Full bottle purchase — deduct sealed stock directly
         const product = await this.productsRepository.findOne({
           where: { id: item.productId },
         });
 
         if (product) {
-          await this.stockService.deductFullBottleStock(
+          const result = await this.stockService.deductFullBottleStock(
             product,
             item.quantity,
             queryRunner,
           );
+          item.bajoPedidoQuantity = result.pendingQuantity;
         }
       }
+      item.stockDeductedAt = now;
+      await queryRunner.manager.save(OrderItem, item);
     }
   }
 
   /**
-   * Verify payment after PayPhone redirect
+   * Verify payment after PayPhone redirect. Idempotent: if the order is
+   * already paid and in a fulfillment status, returns the cached result
+   * without re-querying PayPhone or re-deducting stock.
    */
   async verifyAndConfirmPayment(
     paymentId: string,
     clientTransactionId: string,
   ) {
-    // Find order by clientTransactionId
     const order = await this.ordersRepository.findOne({
       where: { clientTransactionId },
       relations: ['items'],
@@ -306,7 +310,27 @@ export class PaymentsService {
       );
     }
 
-    // Confirm with PayPhone
+    // Idempotency short-circuit — payment already confirmed for this order
+    const fulfillmentStatuses = [
+      OrderStatus.RECEIVED,
+      OrderStatus.ACCEPTED,
+      OrderStatus.SHIPPED,
+      OrderStatus.DELIVERED,
+    ];
+    if (
+      order.paymentStatus === 'paid' &&
+      fulfillmentStatuses.includes(order.status)
+    ) {
+      return {
+        order: new OrderResponseDto(order),
+        paymentStatus: order.paymentStatus,
+        transactionStatus: 3,
+        transactionStatusName: 'Approved',
+        approved: true,
+        alreadyConfirmed: true,
+      };
+    }
+
     const confirmation = await this.payPhoneService.confirm(
       paymentId,
       clientTransactionId,
@@ -347,6 +371,60 @@ export class PaymentsService {
       transactionStatus: confirmation.statusCode,
       transactionStatusName: confirmation.transactionStatus,
       approved,
+    };
+  }
+
+  /**
+   * Reconcile PayPhone payments that never got confirmed because the customer
+   * closed the browser before being redirected back. Looks for orders with
+   * paymentStatus='pending', a payphonePaymentId, and older than 5 minutes —
+   * then calls verifyAndConfirmPayment on each. Safe to run repeatedly.
+   */
+  async reconcilePendingPayphoneOrders() {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+    const candidates = await this.ordersRepository
+      .createQueryBuilder('order')
+      .where('order.paymentStatus = :status', { status: 'pending' })
+      .andWhere('order.payphonePaymentId IS NOT NULL')
+      .andWhere('order.clientTransactionId IS NOT NULL')
+      .andWhere('order.createdAt < :cutoff', { cutoff: fiveMinutesAgo })
+      .getMany();
+
+    const results: Array<{
+      orderId: number;
+      orderNumber: string;
+      outcome: 'confirmed' | 'still_pending' | 'error';
+      message?: string;
+    }> = [];
+
+    for (const order of candidates) {
+      try {
+        const result = await this.verifyAndConfirmPayment(
+          order.payphonePaymentId!,
+          order.clientTransactionId!,
+        );
+        results.push({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          outcome: result.approved ? 'confirmed' : 'still_pending',
+        });
+      } catch (error: any) {
+        results.push({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          outcome: 'error',
+          message: error?.message ?? String(error),
+        });
+      }
+    }
+
+    return {
+      scanned: candidates.length,
+      confirmed: results.filter((r) => r.outcome === 'confirmed').length,
+      stillPending: results.filter((r) => r.outcome === 'still_pending').length,
+      errors: results.filter((r) => r.outcome === 'error').length,
+      details: results,
     };
   }
 

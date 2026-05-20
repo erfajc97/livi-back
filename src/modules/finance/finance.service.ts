@@ -3,11 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, DataSource } from 'typeorm';
 import { Transaction } from './entities/transaction.entity';
 import { Bill } from './entities/bill.entity';
+import { PaymentMethod } from './entities/payment-method.entity';
 import { Order } from '../orders/entities/order.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { CreateBillDto } from './dto/create-bill.dto';
 import { UpdateBillDto } from './dto/update-bill.dto';
+import { CreatePaymentMethodDto } from './dto/create-payment-method.dto';
+import { UpdatePaymentMethodDto } from './dto/update-payment-method.dto';
 
 @Injectable()
 export class FinanceService {
@@ -16,8 +19,42 @@ export class FinanceService {
     private transactionsRepository: Repository<Transaction>,
     @InjectRepository(Bill)
     private billsRepository: Repository<Bill>,
+    @InjectRepository(PaymentMethod)
+    private paymentMethodsRepository: Repository<PaymentMethod>,
     private dataSource: DataSource,
   ) {}
+
+  // ── Payment Methods (CRUD for bills/transactions select) ──
+
+  async findAllPaymentMethods(): Promise<PaymentMethod[]> {
+    return this.paymentMethodsRepository.find({
+      order: { isActive: 'DESC', name: 'ASC' },
+    });
+  }
+
+  async createPaymentMethod(dto: CreatePaymentMethodDto): Promise<PaymentMethod> {
+    const pm = this.paymentMethodsRepository.create({
+      name: dto.name.trim(),
+      detail: dto.detail?.trim() || null,
+      isActive: dto.isActive ?? true,
+    });
+    return this.paymentMethodsRepository.save(pm);
+  }
+
+  async updatePaymentMethod(id: number, dto: UpdatePaymentMethodDto): Promise<PaymentMethod> {
+    const pm = await this.paymentMethodsRepository.findOne({ where: { id } });
+    if (!pm) throw new NotFoundException(`Payment method ${id} not found`);
+    if (dto.name !== undefined) pm.name = dto.name.trim();
+    if (dto.detail !== undefined) pm.detail = dto.detail?.trim() || null;
+    if (dto.isActive !== undefined) pm.isActive = dto.isActive;
+    return this.paymentMethodsRepository.save(pm);
+  }
+
+  async removePaymentMethod(id: number): Promise<void> {
+    const pm = await this.paymentMethodsRepository.findOne({ where: { id } });
+    if (!pm) throw new NotFoundException(`Payment method ${id} not found`);
+    await this.paymentMethodsRepository.remove(pm);
+  }
 
   // ── Transactions ──────────────────────────────────────
 
