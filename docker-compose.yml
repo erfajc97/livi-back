@@ -11,6 +11,8 @@ services:
       # Compose service hostname (must match this service's key: `db`)
       DB_HOST: db
       DB_PORT: 5432
+      # Auto-run TypeORM migrations on app startup
+      DB_MIGRATIONS_RUN: "true"
     depends_on:
       db:
         condition: service_healthy

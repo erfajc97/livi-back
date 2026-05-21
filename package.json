@@ -25,6 +25,7 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/config/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/config/data-source.ts",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeders/index.ts",
+    "seed:prod": "node dist/database/seeders/index.js",
     "export:openapi": "ts-node --transpile-only -r tsconfig-paths/register scripts/export-openapi.ts"
   },
   "dependencies": {

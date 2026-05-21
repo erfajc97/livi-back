@@ -22,6 +22,7 @@ export async function runSeeders() {
     entities: entities, // Use centralized entities to avoid Node.js experimental TypeScript issues
     migrations: [__dirname + '/../migrations/*{.ts,.js}'],
     synchronize: false,
+    migrationsRun: true, // Ensure tables exist before seeding (idempotent: skips already-applied migrations)
     logging: process.env.DB_LOGGING === 'true',
     ssl: process.env.DB_SSL === 'true',
   };
@@ -31,6 +32,7 @@ export async function runSeeders() {
   try {
     console.log(`🔌 Connecting to database: ${dataSourceOptions.host}:${dataSourceOptions.port}/${dataSourceOptions.database} as ${dataSourceOptions.username}`);
     await dataSource.initialize();
+    console.log('🔧 Migrations applied (if any pending)');
     console.log('🌱 Starting database seeding...\n');
 
     for (const SeederClass of seeders) {

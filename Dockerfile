@@ -29,6 +29,10 @@ RUN npm ci --omit=dev
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
@@ -45,5 +49,5 @@ ENV PORT=4001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD ["node","-e","require('http').get('http://127.0.0.1:'+(process.env.PORT||4001)+'/api/settings',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 
-# Start application
-CMD ["node", "dist/main"]
+# Entrypoint runs migrations (via DB_MIGRATIONS_RUN env) + seeders, then starts app
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

@@ -2,25 +2,25 @@ image: atlassian/default-image:3
 
 pipelines:
   branches:
-    develop:
+    main:
       - step:
-          name: Deploy develop to EC2
+          name: Deploy main to EC2
           deployment: staging
           script:
             - pipe: atlassian/ssh-run:0.8.1
               variables:
-                SSH_USER: "ubuntu"
-                SERVER: "13.59.237.74"
-                MODE: "command"
-                EXTRA_ARGS: "-o ServerAliveInterval=1200 -o ServerAliveCountMax=3"
+                SSH_USER: 'ubuntu'
+                SERVER: '13.59.237.74'
+                MODE: 'command'
+                EXTRA_ARGS: '-o ServerAliveInterval=1200 -o ServerAliveCountMax=3'
                 COMMAND: |
                   set -e
 
                   cd ~/api-ecommerce-nestjs
 
                   echo "Updating code..."
-                  git fetch origin develop
-                  git reset --hard origin/develop
+                  git fetch origin main
+                  git reset --hard origin/main
 
                   echo "Stopping current containers..."
                   docker compose down --remove-orphans
@@ -29,7 +29,7 @@ pipelines:
                   docker image prune -af
                   docker builder prune -af || true
 
-                  echo "Building and starting containers..."
+                  echo "Building and starting containers (entrypoint will run seeders)..."
                   docker compose up -d --build
 
                   echo "Current container status:"
