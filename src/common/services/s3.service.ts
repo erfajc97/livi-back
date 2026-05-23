@@ -1,11 +1,14 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import { Agent as HttpsAgent } from 'https';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class S3Service {
+  private readonly logger = new Logger(S3Service.name);
   private s3Client: S3Client;
   private bucketName: string;
   private region: string;
@@ -18,12 +21,24 @@ export class S3Service {
       throw new Error('AWS_S3_BUCKET_NAME is required in environment variables');
     }
 
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    const insecureTls = nodeEnv !== 'production';
+
+    if (insecureTls) {
+      this.logger.warn(
+        'S3Client running with rejectUnauthorized=false (NODE_ENV != production). Do NOT use this setting in production.',
+      );
+    }
+
     this.s3Client = new S3Client({
       region: this.region,
       credentials: {
         accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID', ''),
         secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY', ''),
       },
+      requestHandler: new NodeHttpHandler({
+        httpsAgent: new HttpsAgent({ rejectUnauthorized: !insecureTls }),
+      }),
     });
   }
 

@@ -12,6 +12,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CoerceBoolInterceptor } from '../../common/interceptors/coerce-bool.interceptor';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -38,7 +39,7 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   createCategory(
     @Body() createCategoryDto: CreateCategoryDto,
@@ -98,7 +99,7 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   updateCategory(
     @Param('id') id: string,
@@ -121,7 +122,7 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   createMarca(
     @Body() createMarcaDto: CreateMarcaDto,
@@ -188,7 +189,7 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   updateMarca(
     @Param('id') id: string,
