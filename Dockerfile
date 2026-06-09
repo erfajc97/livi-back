@@ -6,8 +6,13 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies. Aggressive fetch-retries so a transient ECONNRESET
+# from the npm registry doesn't kill the build (single registry download).
+RUN npm ci --no-audit --no-fund \
+    --fetch-retries=5 \
+    --fetch-retry-mintimeout=20000 \
+    --fetch-retry-maxtimeout=120000 \
+    --fetch-timeout=600000
 
 # Copy source code
 COPY . .
@@ -23,8 +28,12 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --omit=dev
+# Reuse the dependencies already downloaded in the builder stage and drop
+# devDependencies locally with `npm prune` — avoids a SECOND registry
+# download (the previous `npm ci --omit=dev` was the step failing on
+# ECONNRESET). prune is an offline operation.
+COPY --from=builder /app/node_modules ./node_modules
+RUN npm prune --omit=dev
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
