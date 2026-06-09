@@ -11,11 +11,13 @@ import { Product } from '../products/entities/product.entity';
 import { ProductVariation } from '../products/entities/product-variation.entity';
 import { OrderStatusHistory } from '../orders/entities/order-status-history.entity';
 import { ProductsModule } from '../products/products.module';
+import { CouponsModule } from '../coupons/coupons.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, OrderItem, OrderStatusHistory, Product, ProductVariation]),
     ProductsModule,
+    CouponsModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, PayPhoneService, S3Service, OrderNotificationService],

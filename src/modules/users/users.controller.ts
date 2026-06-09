@@ -62,7 +62,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Update current user profile', description: 'Update the authenticated user profile' })
   @ApiResponse({ status: 200, type: UserResponseDto })
   updateMe(@CurrentUser() user: User, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(user.id, updateUserDto);
+    // Seguridad: el usuario autenticado NO puede auto-asignarse rol ni
+    // activarse/desactivarse a sí mismo. Esos campos solo los cambia un
+    // admin vía PATCH /users/:id.
+    const { role: _role, isActive: _isActive, ...safe } = updateUserDto;
+    return this.usersService.update(user.id, safe);
   }
 
   @Get(':id')

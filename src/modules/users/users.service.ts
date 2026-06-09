@@ -35,7 +35,10 @@ export class UsersService {
     const user = this.usersRepository.create({
       ...createUserDto,
       password: hashedPassword,
-      role: createUserDto.role || Role.CLIENT,
+      // Seguridad: el registro público NUNCA asigna rol desde el cliente
+      // (evita escalada a ADMIN). Para crear/promover admins, un admin
+      // existente usa PATCH /users/:id (ruta protegida @Roles(ADMIN)).
+      role: Role.CLIENT,
     });
 
     const savedUser = await this.usersRepository.save(user);

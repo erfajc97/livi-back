@@ -76,8 +76,10 @@ export class PayPhoneService {
       storeId: this.storeId,
     };
 
-    console.log('[PayPhone Prepare] URL:', `${this.apiUrl}/button/Prepare`);
-    console.log('[PayPhone Prepare] Payload:', JSON.stringify(payload));
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[PayPhone Prepare] URL:', `${this.apiUrl}/button/Prepare`);
+      console.log('[PayPhone Prepare] Payload:', JSON.stringify(payload));
+    }
 
     try {
       const { data } = await axios.post(
@@ -91,7 +93,9 @@ export class PayPhoneService {
         },
       );
 
-      console.log('[PayPhone Prepare] Response:', JSON.stringify(data));
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[PayPhone Prepare] Response:', JSON.stringify(data));
+      }
 
       return {
         paymentId: data.paymentId,
@@ -101,7 +105,6 @@ export class PayPhoneService {
     } catch (error: any) {
       console.error('[PayPhone Prepare] Error status:', error.response?.status);
       console.error('[PayPhone Prepare] Error data:', JSON.stringify(error.response?.data));
-      console.error('[PayPhone Prepare] Error headers:', JSON.stringify(error.response?.headers));
       const msg = error.response?.data;
       throw new BadRequestException(`PayPhone Prepare failed: ${JSON.stringify(msg)}`);
     }
@@ -130,7 +133,9 @@ export class PayPhoneService {
         },
       );
 
-      console.log('[PayPhone Confirm] Response:', JSON.stringify(data));
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[PayPhone Confirm] Response:', JSON.stringify(data));
+      }
       return data;
     } catch (error: any) {
       console.error('[PayPhone Confirm] Error:', JSON.stringify(error.response?.data));

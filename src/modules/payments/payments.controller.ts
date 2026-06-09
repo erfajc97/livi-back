@@ -83,7 +83,27 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.CLIENT, Role.ADMIN)
-  @UseInterceptors(FileInterceptor('receipt'))
+  @UseInterceptors(
+    FileInterceptor('receipt', {
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      fileFilter: (_req, file, cb) => {
+        const ok = [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+          'application/pdf',
+        ].includes(file.mimetype);
+        cb(
+          ok
+            ? null
+            : new BadRequestException(
+                'Tipo de archivo no permitido (solo jpeg, png, webp o pdf)',
+              ),
+          ok,
+        );
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload transfer receipt for an order' })
   async uploadReceipt(

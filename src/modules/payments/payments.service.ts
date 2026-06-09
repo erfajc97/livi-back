@@ -18,6 +18,7 @@ import { StockService } from '../products/stock.service';
 import { OrderStatusHistory } from '../orders/entities/order-status-history.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { OrderNotificationService } from '../../common/services/order-notification.service';
+import { CouponsService } from '../coupons/coupons.service';
 
 const PAYPHONE_SURCHARGE_RATE = 0.06; // 6%
 
@@ -37,6 +38,7 @@ export class PaymentsService {
     private s3Service: S3Service,
     private stockService: StockService,
     private orderNotificationService: OrderNotificationService,
+    private couponsService: CouponsService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -158,8 +160,28 @@ export class PaymentsService {
       }
 
       // Calculate costs
-      const deliveryCost = dto.deliveryCost ?? 0;
-      const couponDiscount = dto.couponDiscount ?? 0;
+      let deliveryCost = Math.max(0, dto.deliveryCost ?? 0);
+
+      // Cupón: SIEMPRE validado en el servidor (no se confía en
+      // couponDiscount enviado por el cliente). Solo se aplica si el código
+      // es válido; free shipping pone el envío en 0.
+      let couponDiscount = 0;
+      let validatedCouponId: number | null = null;
+      if (dto.couponCode) {
+        const couponResult = await this.couponsService.validate(
+          { code: dto.couponCode, orderAmount: subtotal },
+          user.id,
+        );
+        if (couponResult.valid) {
+          couponDiscount = couponResult.freeShipping
+            ? 0
+            : Number(couponResult.discount) || 0;
+          if (couponResult.freeShipping) deliveryCost = 0;
+          validatedCouponId = couponResult.coupon
+            ? Number(couponResult.coupon.id)
+            : null;
+        }
+      }
       const afterDiscount = Math.max(0, subtotal - couponDiscount);
       const isPayphone = dto.paymentMethod === 'PAYPHONE';
       const payphoneSurcharge = isPayphone
@@ -205,6 +227,13 @@ export class PaymentsService {
       await queryRunner.manager.save(OrderStatusHistory, historyEntry);
 
       await queryRunner.commitTransaction();
+
+      // Registrar uso del cupón (incrementa currentUses) — best effort.
+      if (validatedCouponId != null) {
+        await this.couponsService
+          .recordUsage(validatedCouponId, user.id, savedOrder.id)
+          .catch(() => {});
+      }
 
       // Send notifications (fire and forget)
       const notificationData = {
@@ -378,6 +407,24 @@ export class PaymentsService {
     const approved = this.payPhoneService.isApproved(confirmation.statusCode);
 
     if (approved) {
+      // Anti-tampering: el monto confirmado por PayPhone (en centavos) debe
+      // coincidir con el total de la orden. Evita marcar como pagada una
+      // orden cara reutilizando el pago de otra más barata.
+      const expectedCents = Math.round(Number(order.total) * 100);
+      const paidCents = Math.round(Number(confirmation.amount));
+      if (Math.abs(expectedCents - paidCents) > 1) {
+        order.paymentStatus = 'failed';
+        order.paymentReference = `amount_mismatch expected=${expectedCents} paid=${paidCents}`;
+        await this.ordersRepository.save(order);
+        return {
+          order: new OrderResponseDto(order),
+          paymentStatus: order.paymentStatus,
+          transactionStatus: confirmation.statusCode,
+          transactionStatusName: confirmation.transactionStatus,
+          approved: false,
+        };
+      }
+
       // Use a transaction for stock deduction + order status update
       const queryRunner = this.dataSource.createQueryRunner();
       await queryRunner.connect();
@@ -490,7 +537,12 @@ export class PaymentsService {
       await this.s3Service.deleteFile(order.transferReceiptKey).catch(() => {});
     }
 
-    const uploaded = await this.s3Service.uploadFile(file, 'receipts');
+    const uploaded = await this.s3Service.uploadFile(file, 'receipts', [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+    ]);
     order.transferReceiptUrl = uploaded.url;
     order.transferReceiptKey = uploaded.key;
     order.paymentStatus = 'receipt_uploaded';
