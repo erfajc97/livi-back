@@ -59,6 +59,9 @@ export class PaymentsService {
       // Build order items and calculate subtotal
       const orderItems: OrderItem[] = [];
       let subtotal = 0;
+      // Demanda de decants acumulada por producto (ml). Los decants NO entran
+      // a bajo pedido: solo se venden si hay frasco disponible para abrir.
+      const decantDemand = new Map<number, { product: Product; ml: number }>();
 
       for (const item of dto.items) {
         if (item.productVariationId) {
@@ -78,6 +81,23 @@ export class PaymentsService {
             throw new BadRequestException(
               `Variation ${item.productVariationId} is not active`,
             );
+          }
+
+          // Stock: frasco completo (no bajo pedido) requiere stock sellado;
+          // los decants se acumulan para validar contra el ml disponible.
+          if (variation.isFullBottle) {
+            if (!variation.product.bajoPedido && variation.product.stock < item.quantity) {
+              throw new BadRequestException(
+                `Stock insuficiente de "${variation.product.name}". Disponibles: ${variation.product.stock}, solicitados: ${item.quantity}.`,
+              );
+            }
+          } else {
+            const ml = Number(variation.mlSize || 0) * item.quantity;
+            const prev = decantDemand.get(variation.product.id);
+            decantDemand.set(variation.product.id, {
+              product: variation.product,
+              ml: (prev?.ml ?? 0) + ml,
+            });
           }
 
           const price = item.priceOverride ?? Number(variation.price || variation.product.price);
@@ -105,6 +125,13 @@ export class PaymentsService {
             throw new BadRequestException(`Product ${item.productId} is not active`);
           }
 
+          // Frasco completo directo: si no es bajo pedido, requiere stock.
+          if (!product.bajoPedido && product.stock < item.quantity) {
+            throw new BadRequestException(
+              `Stock insuficiente de "${product.name}". Disponibles: ${product.stock}, solicitados: ${item.quantity}.`,
+            );
+          }
+
           const price = item.priceOverride ?? Number(product.price);
           const itemSubtotal = price * item.quantity;
           subtotal += itemSubtotal;
@@ -115,6 +142,18 @@ export class PaymentsService {
           oi.quantity = item.quantity;
           oi.subtotal = itemSubtotal;
           orderItems.push(oi);
+        }
+      }
+
+      // Validar decants: nunca permitir más ml de los disponibles. Los decants
+      // NO se pueden pedir bajo pedido (requieren un frasco real que abrir).
+      for (const { product: p, ml } of decantDemand.values()) {
+        const availableMl = this.stockService.getAvailableMl(p);
+        if (availableMl < ml) {
+          throw new BadRequestException(
+            `No hay suficiente stock para preparar los decants de "${p.name}". ` +
+              `Disponible: ${availableMl} ml, solicitado: ${ml} ml.`,
+          );
         }
       }
 

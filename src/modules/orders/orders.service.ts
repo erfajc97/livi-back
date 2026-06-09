@@ -97,6 +97,9 @@ export class OrdersService {
       // Validate and process items
       const orderItems: OrderItem[] = [];
       let total = 0;
+      // Demanda de decants acumulada por producto (ml). Los decants NO entran
+      // a bajo pedido: solo se venden si hay frasco disponible para abrir.
+      const decantDemand = new Map<number, { product: Product; ml: number }>();
 
       for (const itemDto of createOrderDto.items) {
         // Validate that either productId or productVariationId is provided, but not both
@@ -144,8 +147,19 @@ export class OrdersService {
             );
           }
 
-          // TODO: Phase 2 — use StockService for decant/full-bottle stock deduction
-          // For now, basic stock check on the product level
+          // Stock: el frasco completo (no bajo pedido) requiere stock sellado;
+          // los decants se acumulan para validar contra el ml disponible.
+          if (productVariation.isFullBottle) {
+            if (!product.bajoPedido && product.stock < itemDto.quantity) {
+              throw new BadRequestException(
+                `Stock insuficiente de "${product.name}". Disponibles: ${product.stock}, solicitados: ${itemDto.quantity}.`,
+              );
+            }
+          } else {
+            const ml = Number(productVariation.mlSize || 0) * itemDto.quantity;
+            const prev = decantDemand.get(product.id);
+            decantDemand.set(product.id, { product, ml: (prev?.ml ?? 0) + ml });
+          }
           price = productVariation.price || product.price;
           productId = product.id;
           productVariationId = productVariation.id;
@@ -227,6 +241,18 @@ export class OrdersService {
         const orderItem = queryRunner.manager.create(OrderItem, orderItemData);
 
         orderItems.push(orderItem);
+      }
+
+      // Validar decants: nunca permitir más ml de los disponibles. A diferencia
+      // del frasco completo, los decants NO se pueden pedir bajo pedido.
+      for (const { product: p, ml } of decantDemand.values()) {
+        const availableMl = this.stockService.getAvailableMl(p);
+        if (availableMl < ml) {
+          throw new BadRequestException(
+            `No hay suficiente stock para preparar los decants de "${p.name}". ` +
+              `Disponible: ${availableMl} ml, solicitado: ${ml} ml.`,
+          );
+        }
       }
 
       // Fetch user info for customer details
