@@ -77,24 +77,32 @@ async function bootstrap() {
     next();
   });
 
-  // CORS: en producción se restringe a orígenes permitidos
-  // (FRONTEND_URL + CORS_ORIGINS, separados por coma); en desarrollo se
-  // permite cualquier origen para facilitar el trabajo local.
+  // CORS: en producción se permiten los dominios propios (nondecants.com y
+  // subdominios) más los orígenes de FRONTEND_URL + CORS_ORIGINS (separados
+  // por coma); en desarrollo se permite cualquier origen.
   const allowedOrigins = [
     ...(process.env.FRONTEND_URL?.split(',') ?? []),
     ...(process.env.CORS_ORIGINS?.split(',') ?? []),
   ]
     .map((o) => o.trim())
     .filter(Boolean);
+  const ownDomainRegex = /^https:\/\/([a-z0-9-]+\.)*nondecants\.com$/i;
   app.enableCors({
-    origin: isProd ? allowedOrigins : true,
+    origin: isProd
+      ? (origin, callback) => {
+          if (
+            !origin ||
+            ownDomainRegex.test(origin) ||
+            allowedOrigins.includes(origin)
+          ) {
+            callback(null, true);
+          } else {
+            callback(null, false);
+          }
+        }
+      : true,
     credentials: true,
   });
-  if (isProd && allowedOrigins.length === 0) {
-    console.warn(
-      '[CORS] NODE_ENV=production pero no hay FRONTEND_URL/CORS_ORIGINS definidos — se bloqueará todo origen cruzado.',
-    );
-  }
 
   const port = process.env.PORT || 4001;
   await app.listen(port);
