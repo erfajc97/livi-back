@@ -1,12 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Combo } from './entities/combo.entity';
 import { ComboProduct } from './entities/combo-product.entity';
 import { Product } from '../products/entities/product.entity';
 import { CreateComboDto } from './dto/create-combo.dto';
 import { UpdateComboDto } from './dto/update-combo.dto';
 import { S3Service } from '../../common/services/s3.service';
+
+// Relaciones de los productos de un combo.
+const PRODUCT_RELATIONS = [
+  'comboProducts',
+  'comboProducts.product',
+  'comboProducts.product.images',
+  'comboProducts.productVariation',
+  'comboProducts.productVariation.images',
+];
+// Mismas relaciones para las versiones anidadas.
+const VERSION_RELATIONS = PRODUCT_RELATIONS.map((r) => `versions.${r}`);
+const FULL_RELATIONS = [...PRODUCT_RELATIONS, 'versions', ...VERSION_RELATIONS];
 
 @Injectable()
 export class CombosService {
@@ -29,6 +41,21 @@ export class CombosService {
       }
     }
 
+    // Si es una versión, hereda el nombre del combo base (mismo nombre).
+    let name = dto.name;
+    const parentComboId = dto.parentComboId ?? null;
+    if (parentComboId != null) {
+      const parent = await this.comboRepository.findOneBy({ id: parentComboId as any });
+      if (!parent) {
+        throw new NotFoundException(`Parent combo with ID ${parentComboId} not found`);
+      }
+      if (parent.parentComboId != null) {
+        // Solo un nivel: una versión no puede ser padre de otra versión.
+        throw new NotFoundException('No se puede crear una versión de otra versión');
+      }
+      name = parent.name;
+    }
+
     // Handle image upload
     let imageUrl = dto.imageUrl;
     let imageKey: string | undefined;
@@ -39,13 +66,14 @@ export class CombosService {
     }
 
     const combo = this.comboRepository.create({
-      name: dto.name,
+      name,
       description: dto.description,
       imageUrl,
       imageKey,
       finalPrice: dto.finalPrice,
       discount: dto.discount ?? 0,
       isActive: dto.isActive ?? true,
+      parentComboId,
     });
 
     const savedCombo = await this.comboRepository.save(combo);
@@ -65,16 +93,19 @@ export class CombosService {
   }
 
   async findAll(): Promise<Combo[]> {
+    // Solo combos base (las versiones vienen anidadas en `versions`).
     return this.comboRepository.find({
-      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.product.images', 'comboProducts.productVariation', 'comboProducts.productVariation.images'],
+      where: { parentComboId: IsNull() },
+      relations: FULL_RELATIONS,
       order: { createdAt: 'DESC' },
     });
   }
 
   async findActive(): Promise<Combo[]> {
+    // Público: solo combos base activos, con sus versiones anidadas.
     return this.comboRepository.find({
-      where: { isActive: true },
-      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.product.images', 'comboProducts.productVariation', 'comboProducts.productVariation.images'],
+      where: { isActive: true, parentComboId: IsNull() },
+      relations: FULL_RELATIONS,
       order: { createdAt: 'DESC' },
     });
   }
@@ -82,7 +113,7 @@ export class CombosService {
   async findOne(id: number): Promise<Combo> {
     const combo = await this.comboRepository.findOne({
       where: { id: id as any },
-      relations: ['comboProducts', 'comboProducts.product', 'comboProducts.product.images', 'comboProducts.productVariation', 'comboProducts.productVariation.images'],
+      relations: FULL_RELATIONS,
     });
     if (!combo) {
       throw new NotFoundException(`Combo with ID ${id} not found`);

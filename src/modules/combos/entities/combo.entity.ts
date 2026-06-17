@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { ComboProduct } from './combo-product.entity';
 
@@ -33,6 +35,18 @@ export class Combo {
 
   @Column({ default: true })
   isActive: boolean;
+
+  // Versiones: un combo "versión" apunta a su combo base. Comparten nombre,
+  // pero traen otros productos y otro precio (p. ej. productos más caros).
+  @Column({ type: 'bigint', nullable: true })
+  parentComboId: number | null;
+
+  @ManyToOne(() => Combo, (c) => c.versions, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'parentComboId' })
+  parent: Combo;
+
+  @OneToMany(() => Combo, (c) => c.parent)
+  versions: Combo[];
 
   @OneToMany(() => ComboProduct, (cp) => cp.combo, { cascade: true, eager: true })
   comboProducts: ComboProduct[];

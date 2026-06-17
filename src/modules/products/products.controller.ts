@@ -8,10 +8,15 @@ import {
   Delete,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { StockService } from './stock.service';
+import { ProductImagesService } from './product-images.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
@@ -29,6 +34,7 @@ export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
     private readonly stockService: StockService,
+    private readonly productImagesService: ProductImagesService,
   ) {}
 
   @Post()
@@ -39,6 +45,21 @@ export class ProductsController {
   @ApiResponse({ status: 201, description: 'Product created successfully', type: ProductResponseDto })
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
+  }
+
+  @Post(':id/signature-image')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Subir imagen de "La firma" del PDP' })
+  @ApiParam({ name: 'id', type: 'number' })
+  uploadSignatureImage(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.productImagesService.uploadSignatureImage(id, file);
   }
 
   @Get()

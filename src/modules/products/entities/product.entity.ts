@@ -98,6 +98,43 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   benefits: string;
 
+  // ── PDP editorial (perfil olfativo / identidad / firma) ──
+  // Título del perfil olfativo (ej. "La pirámide de Layton").
+  @Column({ type: 'varchar', nullable: true })
+  scentProfileTitle: string;
+
+  // 3 secciones: cada una { title, notes:[{name,color}], description }.
+  @Column({ type: 'json', nullable: true })
+  scentSections: Array<{
+    title: string;
+    notes: Array<{ name: string; color: string }>;
+    description: string;
+  }>;
+
+  // Carácter / Ocasión (valores seleccionados de listas predefinidas).
+  @Column({ type: 'json', nullable: true })
+  mood: string[];
+
+  @Column({ type: 'json', nullable: true })
+  occasion: string[];
+
+  // Longevidad / Proyección como barra 0–10 (independiente del enum projection).
+  @Column({ type: 'int', nullable: true })
+  longevity: number;
+
+  @Column({ type: 'int', nullable: true })
+  projectionScore: number;
+
+  // La firma: título + descripción + imagen.
+  @Column({ type: 'varchar', nullable: true })
+  signatureTitle: string;
+
+  @Column({ type: 'text', nullable: true })
+  signatureDescription: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  signatureImageUrl: string;
+
   // Total ml per bottle (e.g., 100ml)
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   totalMl: number;

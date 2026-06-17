@@ -5,11 +5,43 @@ import {
   IsEnum,
   IsOptional,
   IsBoolean,
+  IsArray,
+  ValidateNested,
   Min,
+  Max,
   IsUrl,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
+
+// ── Perfil olfativo (secciones anidadas) ──
+class ScentNoteDto {
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Color hex (ej. #E8D8C0)' })
+  @IsString()
+  color: string;
+}
+
+class ScentSectionDto {
+  @ApiProperty({ example: 'Notas de salida' })
+  @IsString()
+  title: string;
+
+  @ApiProperty({ type: [ScentNoteDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ScentNoteDto)
+  notes: ScentNoteDto[];
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
 
 export class CreateProductDto {
   @ApiProperty({ example: 'Paco Rabanne', description: 'Product name' })
@@ -106,4 +138,58 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   benefits?: string;
+
+  // ── PDP editorial ──
+  @ApiPropertyOptional({ description: 'Título del perfil olfativo (ej. "La pirámide de Layton")' })
+  @IsString()
+  @IsOptional()
+  scentProfileTitle?: string;
+
+  @ApiPropertyOptional({ type: [ScentSectionDto], description: '3 secciones del perfil olfativo' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ScentSectionDto)
+  @IsOptional()
+  scentSections?: ScentSectionDto[];
+
+  @ApiPropertyOptional({ description: 'Carácter (valores seleccionados)', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  mood?: string[];
+
+  @ApiPropertyOptional({ description: 'Ocasión (valores seleccionados)', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  occasion?: string[];
+
+  @ApiPropertyOptional({ example: 8, description: 'Longevidad 0–10' })
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  @IsOptional()
+  longevity?: number;
+
+  @ApiPropertyOptional({ example: 7, description: 'Proyección 0–10 (barra PDP)' })
+  @IsNumber()
+  @Min(0)
+  @Max(10)
+  @IsOptional()
+  projectionScore?: number;
+
+  @ApiPropertyOptional({ description: 'Título de la sección "La firma"' })
+  @IsString()
+  @IsOptional()
+  signatureTitle?: string;
+
+  @ApiPropertyOptional({ description: 'Descripción de la firma' })
+  @IsString()
+  @IsOptional()
+  signatureDescription?: string;
+
+  @ApiPropertyOptional({ description: 'URL de la imagen de la firma' })
+  @IsString()
+  @IsOptional()
+  signatureImageUrl?: string;
 }

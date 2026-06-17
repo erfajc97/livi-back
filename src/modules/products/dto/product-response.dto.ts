@@ -62,6 +62,34 @@ export class ProductResponseDto {
   @ApiProperty({ required: false })
   benefits?: string;
 
+  // ── PDP editorial ──
+  @ApiProperty({ required: false })
+  scentProfileTitle?: string;
+
+  @ApiProperty({ required: false })
+  scentSections?: Array<{ title: string; notes: Array<{ name: string; color: string }>; description: string }>;
+
+  @ApiProperty({ required: false })
+  mood?: string[];
+
+  @ApiProperty({ required: false })
+  occasion?: string[];
+
+  @ApiProperty({ required: false })
+  longevity?: number;
+
+  @ApiProperty({ required: false })
+  projectionScore?: number;
+
+  @ApiProperty({ required: false })
+  signatureTitle?: string;
+
+  @ApiProperty({ required: false })
+  signatureDescription?: string;
+
+  @ApiProperty({ required: false })
+  signatureImageUrl?: string;
+
   @ApiProperty()
   salesCount: number;
 
@@ -107,6 +135,15 @@ export class ProductResponseDto {
     this.discount = product.discount;
     this.detailDescription = product.detailDescription;
     this.benefits = product.benefits;
+    this.scentProfileTitle = product.scentProfileTitle ?? undefined;
+    this.scentSections = product.scentSections ?? undefined;
+    this.mood = product.mood ?? undefined;
+    this.occasion = product.occasion ?? undefined;
+    this.longevity = product.longevity ?? undefined;
+    this.projectionScore = product.projectionScore ?? undefined;
+    this.signatureTitle = product.signatureTitle ?? undefined;
+    this.signatureDescription = product.signatureDescription ?? undefined;
+    this.signatureImageUrl = product.signatureImageUrl ?? undefined;
     this.salesCount = product.salesCount ?? 0;
     this.categoryId = product.categoryId;
     this.marcaId = product.marcaId;

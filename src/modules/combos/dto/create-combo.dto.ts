@@ -63,6 +63,12 @@ export class CreateComboDto {
   @IsOptional()
   isActive?: boolean;
 
+  @ApiProperty({ description: 'Si es una VERSIÓN, ID del combo base (padre)', required: false })
+  @Transform(({ value }) => (value != null && value !== '' ? Number(value) : undefined))
+  @IsNumber()
+  @IsOptional()
+  parentComboId?: number;
+
   @ApiProperty({ description: 'Products in this combo', type: [ComboProductDto] })
   @Transform(({ value }) => {
     const arr = typeof value === 'string' ? JSON.parse(value) : value;
