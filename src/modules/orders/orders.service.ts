@@ -147,15 +147,11 @@ export class OrdersService {
             );
           }
 
-          // Stock: el frasco completo (no bajo pedido) requiere stock sellado;
-          // los decants se acumulan para validar contra el ml disponible.
-          if (productVariation.isFullBottle) {
-            if (!product.bajoPedido && product.stock < itemDto.quantity) {
-              throw new BadRequestException(
-                `Stock insuficiente de "${product.name}". Disponibles: ${product.stock}, solicitados: ${itemDto.quantity}.`,
-              );
-            }
-          } else {
+          // Stock: el frasco completo SIEMPRE se puede pedir. Si no queda stock
+          // sellado, el excedente se importa bajo pedido (se calcula y registra
+          // como bajoPedidoQuantity al confirmar el pago). Los decants NO van
+          // bajo pedido: se acumulan para validar contra el ml disponible.
+          if (!productVariation.isFullBottle) {
             const ml = Number(productVariation.mlSize || 0) * itemDto.quantity;
             const prev = decantDemand.get(product.id);
             decantDemand.set(product.id, { product, ml: (prev?.ml ?? 0) + ml });
@@ -196,12 +192,8 @@ export class OrdersService {
               `Product with ID ${itemDto.productId} has variations. You must order a specific variation instead of the base product. Available variations: ${activeVariations.map((v) => v.id).join(', ')}`,
             );
           } else {
-            // No variations at all — legacy path, sell the base product
-            if (!product.bajoPedido && product.stock < itemDto.quantity) {
-              throw new BadRequestException(
-                `Insufficient stock for product ${itemDto.productId}. Available: ${product.stock}, Requested: ${itemDto.quantity}`,
-              );
-            }
+            // No variations at all — legacy path, sell the base product. El
+            // frasco siempre se puede pedir; el excedente se importa bajo pedido.
             price = product.price;
             productId = product.id;
           }
