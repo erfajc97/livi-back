@@ -25,12 +25,19 @@ pipelines:
                   echo "Stopping current containers..."
                   docker compose down --remove-orphans
 
-                  echo "Cleaning unused Docker resources..."
-                  docker image prune -af
-                  docker builder prune -af || true
+                  echo "Ensuring base images are present (retry against Docker Hub rate limits)..."
+                  for i in 1 2 3; do
+                    docker compose pull db && break
+                    echo "Pull attempt $i failed, retrying in 15s..."
+                    sleep 15
+                  done
 
                   echo "Building and starting containers (entrypoint will run seeders)..."
                   docker compose up -d --build
+
+                  echo "Cleaning unused Docker resources (after up, so live images stay cached)..."
+                  docker image prune -af
+                  docker builder prune -af || true
 
                   echo "Current container status:"
                   docker compose ps
