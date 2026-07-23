@@ -60,6 +60,13 @@ export class PaymentsService {
     try {
       // Build order items and calculate subtotal
       const orderItems: OrderItem[] = [];
+      // Datos legibles por línea para el correo/WhatsApp (nombre real + ml).
+      const notificationItems: {
+        name: string;
+        quantity: number;
+        price: number;
+        ml?: number;
+      }[] = [];
       let subtotal = 0;
       // Demanda de decants acumulada por producto (ml). Los decants NO entran
       // a bajo pedido: solo se venden si hay frasco disponible para abrir.
@@ -110,6 +117,13 @@ export class PaymentsService {
             quantity: item.quantity,
             subtotal: itemSubtotal,
           }));
+
+          notificationItems.push({
+            name: variation.product.name,
+            quantity: item.quantity,
+            price,
+            ml: Number(variation.mlSize) || undefined,
+          });
         } else if (item.productId) {
           // Full bottle purchase — via product directly
           const product = await this.productsRepository.findOne({
@@ -138,6 +152,13 @@ export class PaymentsService {
           oi.quantity = item.quantity;
           oi.subtotal = itemSubtotal;
           orderItems.push(oi);
+
+          notificationItems.push({
+            name: product.name,
+            quantity: item.quantity,
+            price,
+            ml: Number(product.totalMl) || undefined,
+          });
         }
       }
 
@@ -247,12 +268,7 @@ export class PaymentsService {
         deliveryMethod: dto.deliveryMethod,
         shippingAddress: dto.shippingAddress,
         shippingCity: dto.shippingCity,
-        items: orderItems.map((oi) => ({
-          name: 'Producto',
-          quantity: oi.quantity,
-          price: Number(oi.price),
-          ml: oi.productVariationId ? undefined : undefined,
-        })),
+        items: notificationItems,
       };
       const notification = await this.orderNotificationService.notifyNewOrder(notificationData).catch(() => ({ whatsappUrl: '' }));
 

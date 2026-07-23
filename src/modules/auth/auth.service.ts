@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
 import { LoginDto } from './dto/login.dto';
@@ -22,10 +23,31 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private dataSource: DataSource,
   ) {
     this.googleClient = new OAuth2Client(
       this.configService.get<string>('GOOGLE_CLIENT_ID'),
     );
+  }
+
+  /**
+   * Vincula órdenes guest (userId NULL) cuyo customerEmail coincide con el
+   * email del usuario que inicia sesión. Fire-and-forget: no bloquea ni
+   * rompe el login si falla. La query se apoya en un índice parcial funcional
+   * sobre LOWER(customerEmail) WHERE userId IS NULL, así que solo escanea
+   * órdenes huérfanas (barato aunque corra en cada login).
+   */
+  private async linkGuestOrders(userId: number, email: string): Promise<void> {
+    if (!email) return;
+    try {
+      await this.dataSource.query(
+        `UPDATE "orders" SET "userId" = $1
+         WHERE "userId" IS NULL AND LOWER("customerEmail") = LOWER($2)`,
+        [userId, email],
+      );
+    } catch {
+      // best-effort — el login no debe fallar por esto
+    }
   }
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -51,6 +73,9 @@ export class AuthService {
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
+
+    // Reclama cualquier orden guest previa hecha con este email.
+    await this.linkGuestOrders(user.id, user.email);
 
     const payload = { email: user.email, sub: user.id };
 
@@ -175,6 +200,9 @@ export class AuthService {
     if (!user.isActive) {
       throw new UnauthorizedException('User account is inactive');
     }
+
+    // Reclama cualquier orden guest previa hecha con este email.
+    await this.linkGuestOrders(user.id, user.email);
 
     const jwtPayload = { email: user.email, sub: user.id };
 
