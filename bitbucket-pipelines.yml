@@ -16,6 +16,13 @@ pipelines:
                 COMMAND: |
                   set -e
 
+                  # Fuerza el path clásico de Docker Compose: sin bake ni
+                  # attestation manifests. Con bake activo, las imágenes van a
+                  # un image-store (containerd) distinto al que lee `up`, y el
+                  # contenedor de postgres falla con "No such image".
+                  export COMPOSE_BAKE=false
+                  export BUILDX_NO_DEFAULT_ATTESTATIONS=1
+
                   cd ~/api-ecommerce-nestjs
 
                   echo "Updating code..."
@@ -25,11 +32,11 @@ pipelines:
                   echo "Stopping current containers..."
                   docker compose down --remove-orphans
 
-                  echo "Ensuring base images are present (retry against Docker Hub rate limits)..."
-                  for i in 1 2 3; do
-                    docker compose pull db && break
-                    echo "Pull attempt $i failed, retrying in 15s..."
-                    sleep 15
+                  echo "Pulling postgres base image (classic engine, retry on Docker Hub limits)..."
+                  for i in 1 2 3 4 5; do
+                    docker pull postgres:16-alpine && break
+                    echo "postgres pull attempt $i failed, retrying in 20s..."
+                    sleep 20
                   done
 
                   echo "Building and starting containers (entrypoint will run seeders)..."
