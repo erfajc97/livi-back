@@ -18,6 +18,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../common/constants/roles.enum';
 import { Public } from '../../common/decorators/public.decorator';
+import { OptionalAuth } from '../../common/decorators/optional-auth.decorator';
 import { User } from '../users/entities/user.entity';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -28,18 +29,17 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('create-transaction')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @OptionalAuth()
   @ApiBearerAuth('JWT-auth')
-  @Roles(Role.CLIENT, Role.ADMIN)
   @ApiOperation({
-    summary: 'Create order and payment',
+    summary: 'Create order and payment (guest checkout supported)',
     description:
-      'Creates an order and, if paymentMethod is PAYPHONE, returns the PayPhone redirect URL. For TRANSFERENCIA, returns the order directly.',
+      'Creates an order and, if paymentMethod is PAYPHONE, returns the PayPhone redirect URL. For TRANSFERENCIA, returns the order directly. Auth is optional: logged-in orders are linked to the user; guests create an order with no owner.',
   })
   @ApiResponse({ status: 201, description: 'Order created, payment URL returned if PayPhone' })
   async createTransaction(
     @Body() dto: CreatePaymentDto,
-    @CurrentUser() user: User,
+    @CurrentUser() user: User | null,
   ) {
     return this.paymentsService.createOrderAndPayment(dto, user);
   }
@@ -80,9 +80,8 @@ export class PaymentsController {
   }
 
   @Post(':orderId/upload-receipt')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @OptionalAuth()
   @ApiBearerAuth('JWT-auth')
-  @Roles(Role.CLIENT, Role.ADMIN)
   @UseInterceptors(
     FileInterceptor('receipt', {
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
@@ -109,7 +108,7 @@ export class PaymentsController {
   async uploadReceipt(
     @Param('orderId') orderId: string,
     @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() user: User,
+    @CurrentUser() user: User | null,
   ) {
     if (!file) throw new BadRequestException('No file provided');
     return this.paymentsService.uploadTransferReceipt(+orderId, file, user);

@@ -52,7 +52,7 @@ export class PaymentsService {
   /**
    * Create order + initiate payment (PayPhone or Transferencia)
    */
-  async createOrderAndPayment(dto: CreatePaymentDto, user: User) {
+  async createOrderAndPayment(dto: CreatePaymentDto, user: User | null) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -85,15 +85,12 @@ export class PaymentsService {
             );
           }
 
-          // Stock: frasco completo (no bajo pedido) requiere stock sellado;
-          // los decants se acumulan para validar contra el ml disponible.
-          if (variation.isFullBottle) {
-            if (!variation.product.bajoPedido && variation.product.stock < item.quantity) {
-              throw new BadRequestException(
-                `Stock insuficiente de "${variation.product.name}". Disponibles: ${variation.product.stock}, solicitados: ${item.quantity}.`,
-              );
-            }
-          } else {
+          // Frasco completo: SIEMPRE comprable. Si no hay stock sellado, el
+          // excedente se importa bajo pedido (se registra como bajoPedidoQuantity
+          // al descontar stock). Los decants SÍ se topan: se acumulan para
+          // validar contra el ml disponible (no se pueden pedir bajo pedido,
+          // requieren abrir un frasco real).
+          if (!variation.isFullBottle) {
             const ml = Number(variation.mlSize || 0) * item.quantity;
             const prev = decantDemand.get(variation.product.id);
             decantDemand.set(variation.product.id, {
@@ -127,12 +124,9 @@ export class PaymentsService {
             throw new BadRequestException(`Product ${item.productId} is not active`);
           }
 
-          // Frasco completo directo: si no es bajo pedido, requiere stock.
-          if (!product.bajoPedido && product.stock < item.quantity) {
-            throw new BadRequestException(
-              `Stock insuficiente de "${product.name}". Disponibles: ${product.stock}, solicitados: ${item.quantity}.`,
-            );
-          }
+          // Frasco completo directo: SIEMPRE comprable. Sin stock sellado, el
+          // excedente se importa bajo pedido (se registra como bajoPedidoQuantity
+          // al descontar stock). Sin tope duro.
 
           const price = item.priceOverride ?? Number(product.price);
           const itemSubtotal = price * item.quantity;
@@ -170,7 +164,7 @@ export class PaymentsService {
       if (dto.couponCode) {
         const couponResult = await this.couponsService.validate(
           { code: dto.couponCode, orderAmount: subtotal },
-          user.id,
+          user?.id,
         );
         if (couponResult.valid) {
           couponDiscount = couponResult.freeShipping
@@ -194,15 +188,18 @@ export class PaymentsService {
 
       const order = queryRunner.manager.create(Order, {
         orderNumber,
-        userId: user.id,
+        // Guest checkout: sin sesión la orden no tiene dueño (userId null).
+        userId: user?.id ?? null,
         status: OrderStatus.CREATED,
         subtotal,
         deliveryCost,
         payphoneSurcharge,
         couponDiscount,
         total,
-        customerName: dto.customerName || `${user.firstName} ${user.lastName}`,
-        customerEmail: dto.customerEmail || user.email,
+        customerName:
+          dto.customerName ||
+          (user ? `${user.firstName} ${user.lastName}` : ''),
+        customerEmail: dto.customerEmail || user?.email || '',
         customerPhone: dto.customerPhone || '',
         deliveryMethod: dto.deliveryMethod,
         paymentMethod: dto.paymentMethod,
@@ -229,7 +226,9 @@ export class PaymentsService {
       await queryRunner.commitTransaction();
 
       // Registrar uso del cupón (incrementa currentUses) — best effort.
-      if (validatedCouponId != null) {
+      // Solo para usuarios con sesión: recordUsage necesita userId. En guest
+      // se aplica el descuento pero no se registra uso por-usuario.
+      if (validatedCouponId != null && user) {
         await this.couponsService
           .recordUsage(validatedCouponId, user.id, savedOrder.id)
           .catch(() => {});
@@ -238,8 +237,10 @@ export class PaymentsService {
       // Send notifications (fire and forget)
       const notificationData = {
         orderNumber,
-        customerName: dto.customerName || `${user.firstName} ${user.lastName}`,
-        customerEmail: dto.customerEmail || user.email,
+        customerName:
+          dto.customerName ||
+          (user ? `${user.firstName} ${user.lastName}` : ''),
+        customerEmail: dto.customerEmail || user?.email || '',
         customerPhone: dto.customerPhone || '',
         total,
         paymentMethod: dto.paymentMethod,
@@ -520,7 +521,7 @@ export class PaymentsService {
   async uploadTransferReceipt(
     orderId: number,
     file: Express.Multer.File,
-    user: User,
+    user: User | null,
   ) {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId as any },
@@ -528,7 +529,13 @@ export class PaymentsService {
     });
 
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
-    if (order.userId !== user.id && user.role !== 'admin') {
+    // Órdenes guest (sin dueño) aceptan comprobante sin sesión. Las que tienen
+    // dueño exigen ser el propio usuario o un admin.
+    if (
+      order.userId != null &&
+      order.userId !== user?.id &&
+      user?.role !== 'admin'
+    ) {
       throw new BadRequestException('No tienes permisos para esta orden');
     }
 

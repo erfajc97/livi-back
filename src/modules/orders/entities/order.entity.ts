@@ -25,12 +25,13 @@ export class Order {
   @Column({ unique: true })
   orderNumber: string;
 
-  @ManyToOne(() => User)
+  // Guest checkout: una orden puede no tener dueño (sin sesión).
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user: User | null;
 
-  @Column({ type: 'bigint' })
-  userId: number;
+  @Column({ type: 'bigint', nullable: true })
+  userId: number | null;
 
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
