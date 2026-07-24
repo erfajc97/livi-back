@@ -102,6 +102,12 @@ export class ProductResponseDto {
   @ApiProperty({ description: 'Number of active purchasable formats (bottle + decants)' })
   variationsCount: number;
 
+  @ApiProperty({ description: 'Cheapest active format price' })
+  minFormatPrice: number;
+
+  @ApiProperty({ description: 'Most expensive active format price' })
+  maxFormatPrice: number;
+
   @ApiProperty({ type: [ProductVariationResponseDto], required: false })
   variations?: ProductVariationResponseDto[];
 
@@ -154,6 +160,24 @@ export class ProductResponseDto {
     // en el detalle, la longitud de las variaciones cargadas.
     this.variationsCount =
       product.variationsCount ?? (product.variations?.length ?? 0);
+    // Rango de precio de formatos (frasco + decants). En el list viene del
+    // agregado (minFormatPrice/maxFormatPrice); en el detalle se deriva de
+    // las variaciones cargadas; si no hay, cae al precio del producto.
+    const variationPrices = (product.variations ?? [])
+      .map((v: any) => Number(v.price))
+      .filter((n: number) => !Number.isNaN(n));
+    this.minFormatPrice =
+      product.minFormatPrice != null
+        ? Number(product.minFormatPrice)
+        : variationPrices.length
+          ? Math.min(...variationPrices)
+          : Number(product.price);
+    this.maxFormatPrice =
+      product.maxFormatPrice != null
+        ? Number(product.maxFormatPrice)
+        : variationPrices.length
+          ? Math.max(...variationPrices)
+          : Number(product.price);
     this.createdAt = product.createdAt;
     this.updatedAt = product.updatedAt;
 

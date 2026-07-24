@@ -218,6 +218,32 @@ export class ProductsService {
     // Get results and total count
     const [products, total] = await queryBuilder.getManyAndCount();
 
+    // Rango de precio por producto (formato más barato / más caro) de las
+    // variaciones activas de esta página. Una sola query agregada.
+    const productIds = products.map((p) => p.id);
+    if (productIds.length > 0) {
+      const priceAgg = await this.variationsRepository
+        .createQueryBuilder('v')
+        .select('v.productId', 'productId')
+        .addSelect('MIN(v.price)', 'min')
+        .addSelect('MAX(v.price)', 'max')
+        .where('v.productId IN (:...productIds)', { productIds })
+        .andWhere('v.isActive = :vActive', { vActive: true })
+        .groupBy('v.productId')
+        .getRawMany();
+
+      const priceById = new Map(
+        priceAgg.map((r) => [String(r.productId), r]),
+      );
+      for (const product of products) {
+        const r = priceById.get(String(product.id));
+        if (r) {
+          (product as any).minFormatPrice = Number(r.min);
+          (product as any).maxFormatPrice = Number(r.max);
+        }
+      }
+    }
+
     // Map to DTOs
     const data = products.map((product) => new ProductResponseDto(product, false));
 
