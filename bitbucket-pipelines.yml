@@ -32,12 +32,24 @@ pipelines:
                   echo "Stopping current containers..."
                   docker compose down --remove-orphans
 
-                  echo "Pulling postgres base image (classic engine, retry on Docker Hub limits)..."
-                  for i in 1 2 3 4 5; do
-                    docker pull postgres:16-alpine && break
-                    echo "postgres pull attempt $i failed, retrying in 20s..."
-                    sleep 20
-                  done
+                  echo "=== Disk / Docker usage ==="
+                  df -h / || true
+                  docker system df || true
+
+                  # Limpieza SEGURA antes de construir: solo capas dangling.
+                  # No toca imágenes etiquetadas (postgres:16-alpine se queda).
+                  echo "Pruning dangling layers (keeps tagged images)..."
+                  docker image prune -f || true
+
+                  echo "Pulling postgres base image..."
+                  if ! docker pull postgres:16-alpine; then
+                    echo "!!! FALLO REAL: 'docker pull postgres:16-alpine' no pudo descargar la imagen."
+                    echo "!!! Mira el error de arriba:"
+                    echo "!!!   'toomanyrequests'      -> limite de Docker Hub: corre 'docker login' en el server"
+                    echo "!!!   'no space left'        -> disco lleno: 'docker image prune -af' (NUNCA uses --volumes)"
+                    echo "!!!   timeout / dns / i/o    -> el server no alcanza registry-1.docker.io"
+                    exit 1
+                  fi
 
                   echo "Building and starting containers (entrypoint will run seeders)..."
                   docker compose up -d --build
