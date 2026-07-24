@@ -16,10 +16,10 @@ pipelines:
                 COMMAND: |
                   set -e
 
-                  # Fuerza el path clásico de Docker Compose: sin bake ni
-                  # attestation manifests. Con bake activo, las imágenes van a
-                  # un image-store (containerd) distinto al que lee `up`, y el
-                  # contenedor de postgres falla con "No such image".
+                  # Path clasico de Docker Compose: sin bake ni attestation
+                  # manifests, para que build y run compartan un solo image
+                  # store. (Sin backticks en comentarios: el agente los expande
+                  # como sustitucion de comando.)
                   export COMPOSE_BAKE=false
                   export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
@@ -29,34 +29,39 @@ pipelines:
                   git fetch origin main
                   git reset --hard origin/main
 
-                  echo "Stopping current containers..."
-                  docker compose down --remove-orphans
-
                   echo "=== Disk / Docker usage ==="
                   df -h / || true
                   docker system df || true
 
-                  # Limpieza SEGURA antes de construir: solo capas dangling.
-                  # No toca imágenes etiquetadas (postgres:16-alpine se queda).
-                  echo "Pruning dangling layers (keeps tagged images)..."
-                  docker image prune -f || true
-
-                  echo "Pulling postgres base image..."
-                  if ! docker pull postgres:16-alpine; then
-                    echo "!!! FALLO REAL: 'docker pull postgres:16-alpine' no pudo descargar la imagen."
-                    echo "!!! Mira el error de arriba:"
-                    echo "!!!   'toomanyrequests'      -> limite de Docker Hub: corre 'docker login' en el server"
-                    echo "!!!   'no space left'        -> disco lleno: 'docker image prune -af' (NUNCA uses --volumes)"
-                    echo "!!!   timeout / dns / i/o    -> el server no alcanza registry-1.docker.io"
-                    exit 1
+                  # La imagen solo se descarga si falta. Al no bajar nunca la
+                  # DB (ver abajo), en deploys siguientes ya esta presente y no
+                  # se toca Docker Hub.
+                  echo "Ensuring postgres image is present..."
+                  if docker image inspect postgres:16-alpine > /dev/null 2>&1; then
+                    echo "postgres:16-alpine ya presente."
+                  else
+                    echo "postgres:16-alpine ausente, descargando..."
+                    if ! docker pull postgres:16-alpine; then
+                      echo "!!! FALLO REAL: docker pull postgres:16-alpine"
+                      echo "!!!   toomanyrequests   -> limite Docker Hub: corre 'docker login' en el server"
+                      echo "!!!   no space left     -> disco lleno: docker image prune -af (NUNCA --volumes)"
+                      echo "!!!   timeout/dns/i/o   -> el server no alcanza registry-1.docker.io"
+                      exit 1
+                    fi
                   fi
 
-                  echo "Building and starting containers (entrypoint will run seeders)..."
-                  docker compose up -d --build
+                  # NO se hace 'compose down': tirar la DB borraba su contenedor
+                  # y obligaba a re-descargar postgres en cada deploy. La DB
+                  # queda arriba y solo se reconstruye la api.
+                  echo "Ensuring db is up..."
+                  docker compose up -d db
 
-                  echo "Cleaning unused Docker resources (after up, so live images stay cached)..."
-                  docker image prune -af
-                  docker builder prune -af || true
+                  echo "Rebuilding and restarting only the api (entrypoint runs seeders)..."
+                  docker compose up -d --build --no-deps api
+
+                  echo "Pruning dangling layers and old build cache (keeps tagged images)..."
+                  docker image prune -f || true
+                  docker builder prune -f --filter until=168h || true
 
                   echo "Current container status:"
                   docker compose ps
