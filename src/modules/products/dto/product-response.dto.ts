@@ -99,6 +99,9 @@ export class ProductResponseDto {
   @ApiProperty()
   marcaId: number;
 
+  @ApiProperty({ description: 'Number of active purchasable formats (bottle + decants)' })
+  variationsCount: number;
+
   @ApiProperty({ type: [ProductVariationResponseDto], required: false })
   variations?: ProductVariationResponseDto[];
 
@@ -147,6 +150,10 @@ export class ProductResponseDto {
     this.salesCount = product.salesCount ?? 0;
     this.categoryId = product.categoryId;
     this.marcaId = product.marcaId;
+    // Conteo de formatos: usa el count del list (loadRelationCountAndMap) o,
+    // en el detalle, la longitud de las variaciones cargadas.
+    this.variationsCount =
+      product.variationsCount ?? (product.variations?.length ?? 0);
     this.createdAt = product.createdAt;
     this.updatedAt = product.updatedAt;
 

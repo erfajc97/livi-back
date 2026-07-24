@@ -139,7 +139,15 @@ export class ProductsService {
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.marca', 'marca')
       .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect('product.videos', 'videos');
+      .leftJoinAndSelect('product.videos', 'videos')
+      // Conteo de formatos comprables (frasco + decants) sin traer las filas
+      // de variación: barato y no multiplica el resultado ni la paginación.
+      .loadRelationCountAndMap(
+        'product.variationsCount',
+        'product.variations',
+        'vcount',
+        (qb) => qb.andWhere('vcount.isActive = :vcountActive', { vcountActive: true }),
+      );
 
     // Apply filters
     if (categoryId) {
