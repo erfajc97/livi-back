@@ -16,10 +16,13 @@ pipelines:
                 COMMAND: |
                   set -e
 
-                  # Path clasico de Docker Compose: sin bake ni attestation
-                  # manifests, para que build y run compartan un solo image
-                  # store. (Sin backticks en comentarios: el agente los expande
-                  # como sustitucion de comando.)
+                  # OJO: este script viaja dentro de bash -c con comillas
+                  # simples, asi que NO puede contener comillas simples ni
+                  # backticks: rompen la cadena y el shell muere con
+                  # "unexpected EOF". Usar solo comillas dobles.
+                  #
+                  # COMPOSE_BAKE/attestations off: build y run comparten un
+                  # solo image store.
                   export COMPOSE_BAKE=false
                   export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
@@ -42,15 +45,15 @@ pipelines:
                   else
                     echo "postgres:16-alpine ausente, descargando..."
                     if ! docker pull postgres:16-alpine; then
-                      echo "!!! FALLO REAL: docker pull postgres:16-alpine"
-                      echo "!!!   toomanyrequests   -> limite Docker Hub: corre 'docker login' en el server"
-                      echo "!!!   no space left     -> disco lleno: docker image prune -af (NUNCA --volumes)"
-                      echo "!!!   timeout/dns/i/o   -> el server no alcanza registry-1.docker.io"
+                      echo "FALLO REAL: docker pull postgres:16-alpine"
+                      echo "  toomanyrequests -> limite Docker Hub, corre docker login en el server"
+                      echo "  no space left   -> disco lleno, corre docker image prune -af (NUNCA --volumes)"
+                      echo "  timeout/dns/io  -> el server no alcanza registry-1.docker.io"
                       exit 1
                     fi
                   fi
 
-                  # NO se hace 'compose down': tirar la DB borraba su contenedor
+                  # No se hace compose down: tirar la DB borraba su contenedor
                   # y obligaba a re-descargar postgres en cada deploy. La DB
                   # queda arriba y solo se reconstruye la api.
                   echo "Ensuring db is up..."
