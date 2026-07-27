@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductVariation } from './entities/product-variation.entity';
 import { BottleEvent } from './entities/bottle-event.entity';
@@ -139,15 +139,7 @@ export class ProductsService {
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.marca', 'marca')
       .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect('product.videos', 'videos')
-      // Conteo de formatos comprables (frasco + decants) sin traer las filas
-      // de variación: barato y no multiplica el resultado ni la paginación.
-      .loadRelationCountAndMap(
-        'product.variationsCount',
-        'product.variations',
-        'vcount',
-        (qb) => qb.andWhere('vcount.isActive = :vcountActive', { vcountActive: true }),
-      );
+      .leftJoinAndSelect('product.videos', 'videos');
 
     // Apply filters
     if (categoryId) {
@@ -218,29 +210,42 @@ export class ProductsService {
     // Get results and total count
     const [products, total] = await queryBuilder.getManyAndCount();
 
-    // Rango de precio por producto (formato más barato / más caro) de las
-    // variaciones activas de esta página. Una sola query agregada.
+    // Formatos por producto (frasco + decants activos) de la página actual.
+    // Una sola query trae las variaciones; de ahí derivamos conteo, rango de
+    // precio y la lista compacta de formatos que muestran las cards.
     const productIds = products.map((p) => p.id);
     if (productIds.length > 0) {
-      const priceAgg = await this.variationsRepository
-        .createQueryBuilder('v')
-        .select('v.productId', 'productId')
-        .addSelect('MIN(v.price)', 'min')
-        .addSelect('MAX(v.price)', 'max')
-        .where('v.productId IN (:...productIds)', { productIds })
-        .andWhere('v.isActive = :vActive', { vActive: true })
-        .groupBy('v.productId')
-        .getRawMany();
+      const variations = await this.variationsRepository.find({
+        where: { productId: In(productIds), isActive: true },
+        select: ['id', 'productId', 'mlSize', 'price', 'isFullBottle'],
+      });
 
-      const priceById = new Map(
-        priceAgg.map((r) => [String(r.productId), r]),
-      );
+      const byProduct = new Map<string, ProductVariation[]>();
+      for (const v of variations) {
+        const key = String(v.productId);
+        if (!byProduct.has(key)) byProduct.set(key, []);
+        byProduct.get(key)!.push(v);
+      }
+
       for (const product of products) {
-        const r = priceById.get(String(product.id));
-        if (r) {
-          (product as any).minFormatPrice = Number(r.min);
-          (product as any).maxFormatPrice = Number(r.max);
+        const vs = byProduct.get(String(product.id)) ?? [];
+        // Orden: frasco primero, luego decants por ml ascendente.
+        vs.sort((a, b) => {
+          if (a.isFullBottle !== b.isFullBottle) return a.isFullBottle ? -1 : 1;
+          return Number(a.mlSize) - Number(b.mlSize);
+        });
+        (product as any).variationsCount = vs.length;
+        if (vs.length) {
+          const prices = vs.map((v) => Number(v.price));
+          (product as any).minFormatPrice = Math.min(...prices);
+          (product as any).maxFormatPrice = Math.max(...prices);
         }
+        (product as any).formats = vs.map((v) => ({
+          id: v.id,
+          ml: Number(v.mlSize),
+          price: Number(v.price),
+          isFullBottle: !!v.isFullBottle,
+        }));
       }
     }
 

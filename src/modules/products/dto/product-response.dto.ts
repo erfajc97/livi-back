@@ -108,6 +108,12 @@ export class ProductResponseDto {
   @ApiProperty({ description: 'Most expensive active format price' })
   maxFormatPrice: number;
 
+  @ApiProperty({
+    required: false,
+    description: 'Compact list of active formats (bottle + decants) for cards',
+  })
+  formats?: { id: number; ml: number; price: number; isFullBottle: boolean }[];
+
   @ApiProperty({ type: [ProductVariationResponseDto], required: false })
   variations?: ProductVariationResponseDto[];
 
@@ -178,6 +184,18 @@ export class ProductResponseDto {
         : variationPrices.length
           ? Math.max(...variationPrices)
           : Number(product.price);
+    // Lista compacta de formatos: del list (product.formats) o derivada de las
+    // variaciones cargadas en el detalle.
+    this.formats =
+      product.formats ??
+      (product.variations?.length
+        ? product.variations.map((v: any) => ({
+            id: Number(v.id),
+            ml: Number(v.mlSize),
+            price: Number(v.price),
+            isFullBottle: !!v.isFullBottle,
+          }))
+        : undefined);
     this.createdAt = product.createdAt;
     this.updatedAt = product.updatedAt;
 
