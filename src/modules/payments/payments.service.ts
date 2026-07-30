@@ -68,8 +68,8 @@ export class PaymentsService {
         ml?: number;
       }[] = [];
       let subtotal = 0;
-      // Demanda de decants acumulada por producto (ml). Los decants NO entran
-      // a bajo pedido: solo se venden si hay frasco disponible para abrir.
+      // Demanda de decants acumulada por producto (ml). Tope: el ml físico del
+      // producto (no se importan decants sueltos sin frasco que abrir).
       const decantDemand = new Map<number, { product: Product; ml: number }>();
 
       for (const item of dto.items) {
@@ -94,9 +94,10 @@ export class PaymentsService {
 
           // Frasco completo: SIEMPRE comprable. Si no hay stock sellado, el
           // excedente se importa bajo pedido (se registra como bajoPedidoQuantity
-          // al descontar stock). Los decants SÍ se topan: se acumulan para
-          // validar contra el ml disponible (no se pueden pedir bajo pedido,
-          // requieren abrir un frasco real).
+          // al descontar stock). Los decants se topan al ml físico del producto:
+          // se acumulan aquí para validar contra el inventario. Si los frascos
+          // del MISMO pedido consumen ese ml, los decants no se rechazan — al
+          // descontar quedan marcados como bajo pedido.
           if (!variation.isFullBottle) {
             const ml = Number(variation.mlSize || 0) * item.quantity;
             const prev = decantDemand.get(variation.product.id);
@@ -162,8 +163,9 @@ export class PaymentsService {
         }
       }
 
-      // Validar decants: nunca permitir más ml de los disponibles. Los decants
-      // NO se pueden pedir bajo pedido (requieren un frasco real que abrir).
+      // Validar decants: nunca permitir más ml de los que existen físicamente.
+      // (Los frascos del mismo pedido no restan aquí: si se llevan el stock, el
+      // descuento marca esos decants como bajo pedido en vez de rechazarlos.)
       for (const { product: p, ml } of decantDemand.values()) {
         const availableMl = this.stockService.getAvailableMl(p);
         if (availableMl < ml) {
@@ -327,14 +329,35 @@ export class PaymentsService {
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
     const now = new Date();
-    for (const item of order.items) {
-      if (item.stockDeductedAt) continue;
+    const pendingItems = order.items.filter((i) => !i.stockDeductedAt);
 
-      if (item.productVariationId) {
-        const variation = await this.variationsRepository.findOne({
+    // Resolver las variaciones una sola vez: hace falta saber cuáles son
+    // decants ANTES de descontar para poder ordenar el descuento.
+    const variations = new Map<number, ProductVariation>();
+    for (const item of pendingItems) {
+      if (item.productVariationId && !variations.has(item.productVariationId)) {
+        const v = await this.variationsRepository.findOne({
           where: { id: item.productVariationId },
           relations: ['product'],
         });
+        if (v) variations.set(item.productVariationId, v);
+      }
+    }
+
+    // Los frascos sellados tienen prioridad sobre los decants: si el pedido
+    // lleva ambos del mismo producto, las botellas consumen el stock y los ml
+    // que ya no alcanzan quedan como bajoPedidoQuantity en los decants.
+    const isDecant = (item: OrderItem) => {
+      const v = item.productVariationId ? variations.get(item.productVariationId) : null;
+      return v ? !v.isFullBottle : false;
+    };
+    const ordered = [...pendingItems].sort(
+      (a, b) => Number(isDecant(a)) - Number(isDecant(b)),
+    );
+
+    for (const item of ordered) {
+      if (item.productVariationId) {
+        const variation = variations.get(item.productVariationId);
 
         if (!variation || !variation.product) continue;
 

@@ -23,7 +23,12 @@ export class BannersService {
       createBannerDto.imageUrl = uploaded.url;
       createBannerDto.imageKey = uploaded.key;
     }
-    const banner = this.bannersRepository.create(createBannerDto);
+    // La columna `title` es NOT NULL: sin texto se guarda vacío (el front
+    // simplemente no renderiza el titular).
+    const banner = this.bannersRepository.create({
+      ...createBannerDto,
+      title: createBannerDto.title ?? '',
+    });
     return this.bannersRepository.save(banner);
   }
 

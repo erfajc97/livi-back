@@ -97,8 +97,8 @@ export class OrdersService {
       // Validate and process items
       const orderItems: OrderItem[] = [];
       let total = 0;
-      // Demanda de decants acumulada por producto (ml). Los decants NO entran
-      // a bajo pedido: solo se venden si hay frasco disponible para abrir.
+      // Demanda de decants acumulada por producto (ml). Tope: el ml físico del
+      // producto (no se importan decants sueltos sin frasco que abrir).
       const decantDemand = new Map<number, { product: Product; ml: number }>();
 
       for (const itemDto of createOrderDto.items) {
@@ -149,8 +149,9 @@ export class OrdersService {
 
           // Stock: el frasco completo SIEMPRE se puede pedir. Si no queda stock
           // sellado, el excedente se importa bajo pedido (se calcula y registra
-          // como bajoPedidoQuantity al confirmar el pago). Los decants NO van
-          // bajo pedido: se acumulan para validar contra el ml disponible.
+          // como bajoPedidoQuantity al confirmar el pago). Los decants se topan
+          // al ml físico del producto; si los frascos del mismo pedido ocupan
+          // ese ml, el sobrante queda bajo pedido al descontar.
           if (!productVariation.isFullBottle) {
             const ml = Number(productVariation.mlSize || 0) * itemDto.quantity;
             const prev = decantDemand.get(product.id);
@@ -235,8 +236,9 @@ export class OrdersService {
         orderItems.push(orderItem);
       }
 
-      // Validar decants: nunca permitir más ml de los disponibles. A diferencia
-      // del frasco completo, los decants NO se pueden pedir bajo pedido.
+      // Validar decants: nunca permitir más ml de los que existen físicamente.
+      // (Los frascos del mismo pedido no restan aquí: si se llevan el stock, el
+      // descuento marca esos decants como bajo pedido en vez de rechazarlos.)
       for (const { product: p, ml } of decantDemand.values()) {
         const availableMl = this.stockService.getAvailableMl(p);
         if (availableMl < ml) {
@@ -464,17 +466,42 @@ export class OrdersService {
   ): Promise<void> {
     console.log(`[StockDeduction] Order ${order.orderNumber}: ${order.items.length} items`);
     const now = new Date();
-    for (const item of order.items) {
-      if (item.stockDeductedAt) {
-        console.log(`[StockDeduction] Item ${item.id} already deducted at ${item.stockDeductedAt} — skipping`);
-        continue;
+    const pendingItems = order.items.filter((i) => {
+      if (i.stockDeductedAt) {
+        console.log(`[StockDeduction] Item ${i.id} already deducted at ${i.stockDeductedAt} — skipping`);
+        return false;
       }
-      console.log(`[StockDeduction] Item: productId=${item.productId}, variationId=${item.productVariationId}, qty=${item.quantity}`);
-      if (item.productVariationId) {
-        const variation = await this.productVariationsRepository.findOne({
+      return true;
+    });
+
+    // Resolver las variaciones una sola vez: hace falta saber cuáles son
+    // decants ANTES de descontar para poder ordenar el descuento.
+    const variations = new Map<number, ProductVariation>();
+    for (const item of pendingItems) {
+      if (item.productVariationId && !variations.has(item.productVariationId)) {
+        const v = await this.productVariationsRepository.findOne({
           where: { id: item.productVariationId },
           relations: ['product'],
         });
+        if (v) variations.set(item.productVariationId, v);
+      }
+    }
+
+    // Los frascos sellados tienen prioridad sobre los decants: si el pedido
+    // lleva ambos del mismo producto, las botellas consumen el stock y los ml
+    // que ya no alcanzan quedan como bajoPedidoQuantity en los decants.
+    const isDecant = (item: OrderItem) => {
+      const v = item.productVariationId ? variations.get(item.productVariationId) : null;
+      return v ? !v.isFullBottle : false;
+    };
+    const ordered = [...pendingItems].sort(
+      (a, b) => Number(isDecant(a)) - Number(isDecant(b)),
+    );
+
+    for (const item of ordered) {
+      console.log(`[StockDeduction] Item: productId=${item.productId}, variationId=${item.productVariationId}, qty=${item.quantity}`);
+      if (item.productVariationId) {
+        const variation = variations.get(item.productVariationId);
 
         if (!variation || !variation.product) continue;
 

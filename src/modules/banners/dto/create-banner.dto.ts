@@ -1,12 +1,14 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { BannerType } from '../entities/banner.entity';
 
 export class CreateBannerDto {
-  @ApiProperty({ example: 'Promo Verano', description: 'Banner title' })
+  // El texto del banner es opcional: hay artes que ya traen el título quemado
+  // en la imagen y no deben mostrar texto encima.
+  @ApiPropertyOptional({ example: 'Promo Verano', description: 'Banner title (optional)' })
   @IsString()
-  @IsNotEmpty()
-  title: string;
+  @IsOptional()
+  title?: string;
 
   @ApiPropertyOptional({ example: 'Hasta 50% de descuento', description: 'Banner subtitle' })
   @IsString()
