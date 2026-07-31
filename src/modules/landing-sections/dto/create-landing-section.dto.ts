@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsInt, IsBoolean, IsOptional, IsArray, Min } from 'class-validator';
+import { IsString, IsInt, IsBoolean, IsOptional, IsArray, IsEnum, Min } from 'class-validator';
+import { SectionPlacement } from '../entities/landing-section.entity';
 
 export class CreateLandingSectionDto {
   @ApiProperty({ example: 'ÚLTIMOS INGRESOS' })
@@ -10,6 +11,16 @@ export class CreateLandingSectionDto {
   @IsInt()
   @Min(1)
   order: number;
+
+  @ApiProperty({
+    enum: SectionPlacement,
+    example: SectionPlacement.HOME,
+    required: false,
+    description: 'Dónde se muestra: home (default) o cart (recomendados del carrito)',
+  })
+  @IsOptional()
+  @IsEnum(SectionPlacement)
+  placement?: SectionPlacement;
 
   @ApiProperty({ example: true, required: false })
   @IsOptional()

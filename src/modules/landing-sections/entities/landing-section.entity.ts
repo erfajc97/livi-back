@@ -9,6 +9,12 @@ import {
 } from 'typeorm';
 import { Product } from '../../products/entities/product.entity';
 
+/** Dónde se pinta la sección: home o el bloque de recomendados del carrito. */
+export enum SectionPlacement {
+  HOME = 'home',
+  CART = 'cart',
+}
+
 @Entity('landing_sections')
 export class LandingSection {
   @PrimaryGeneratedColumn({ type: 'bigint' })
@@ -19,6 +25,9 @@ export class LandingSection {
 
   @Column({ type: 'int' })
   order: number;
+
+  @Column({ type: 'varchar', length: 20, default: SectionPlacement.HOME })
+  placement: SectionPlacement;
 
   @Column({ default: true })
   isActive: boolean;

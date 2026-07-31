@@ -6,9 +6,11 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { SectionPlacement } from './entities/landing-section.entity';
 import { LandingSectionsService } from './landing-sections.service';
 import { CreateLandingSectionDto } from './dto/create-landing-section.dto';
 import { UpdateLandingSectionDto } from './dto/update-landing-section.dto';
@@ -46,10 +48,14 @@ export class LandingSectionsController {
 
   @Get('active')
   @Public()
-  @ApiOperation({ summary: 'Get active landing sections', description: 'Retrieve active landing sections for public view' })
+  @ApiOperation({
+    summary: 'Get active landing sections',
+    description: 'Retrieve active landing sections for public view, optionally filtered by placement (home | cart)',
+  })
+  @ApiQuery({ name: 'placement', enum: SectionPlacement, required: false })
   @ApiResponse({ status: 200, description: 'List of active sections', type: [LandingSectionResponseDto] })
-  findActive() {
-    return this.landingSectionsService.findActive();
+  findActive(@Query('placement') placement?: SectionPlacement) {
+    return this.landingSectionsService.findActive(placement);
   }
 
   @Get(':id')

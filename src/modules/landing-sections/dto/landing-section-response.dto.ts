@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ProductResponseDto } from '../../products/dto/product-response.dto';
+import { SectionPlacement } from '../entities/landing-section.entity';
 
 export class LandingSectionResponseDto {
   @ApiProperty({ example: 1 })
@@ -10,6 +11,9 @@ export class LandingSectionResponseDto {
 
   @ApiProperty({ example: 1 })
   order: number;
+
+  @ApiProperty({ enum: SectionPlacement, example: SectionPlacement.HOME })
+  placement: SectionPlacement;
 
   @ApiProperty({ example: true })
   isActive: boolean;

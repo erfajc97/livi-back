@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { LandingSection } from './entities/landing-section.entity';
+import { LandingSection, SectionPlacement } from './entities/landing-section.entity';
 import { Product } from '../products/entities/product.entity';
 import { CreateLandingSectionDto } from './dto/create-landing-section.dto';
 import { UpdateLandingSectionDto } from './dto/update-landing-section.dto';
@@ -33,15 +33,16 @@ export class LandingSectionsService {
 
   async findAll(): Promise<LandingSection[]> {
     return this.landingSectionsRepository.find({
-      relations: ['products', 'products.marca', 'products.category', 'products.images'],
+      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations'],
       order: { order: 'ASC' },
     });
   }
 
-  async findActive(): Promise<LandingSection[]> {
+  /** Secciones visibles, filtrables por ubicación (home / cart). */
+  async findActive(placement?: SectionPlacement): Promise<LandingSection[]> {
     return this.landingSectionsRepository.find({
-      where: { isActive: true },
-      relations: ['products', 'products.marca', 'products.category', 'products.images'],
+      where: { isActive: true, ...(placement ? { placement } : {}) },
+      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations'],
       order: { order: 'ASC' },
     });
   }
@@ -49,7 +50,7 @@ export class LandingSectionsService {
   async findOne(id: number): Promise<LandingSection> {
     const section = await this.landingSectionsRepository.findOne({
       where: { id },
-      relations: ['products', 'products.marca', 'products.category', 'products.images'],
+      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations'],
     });
 
     if (!section) {
