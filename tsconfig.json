@@ -11,6 +11,10 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "incremental": true,
+    // El estado incremental vive DENTRO de dist. Si se queda en la raíz y dist
+    // se borra o se corrompe, tsc cree que ya emitió todo, no genera nada y
+    // arrancar falla con "Cannot find module dist/main".
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
     "skipLibCheck": true,
     "strictNullChecks": true,
     "noImplicitAny": true,
