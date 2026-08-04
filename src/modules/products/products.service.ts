@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, ILike } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductVariation } from './entities/product-variation.entity';
 import { BottleEvent } from './entities/bottle-event.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
+import { Category } from '../categories/entities/category.entity';
+import { Marca } from '../categories/entities/marca.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
@@ -32,6 +34,106 @@ export class ProductsService {
     await this.ensureFullBottleVariation(savedProduct);
 
     return this.findOne(savedProduct.id);
+  }
+
+  /**
+   * Importación masiva (plantilla Excel del admin). Cada fila se valida y crea
+   * de forma independiente: una fila mala no detiene el lote. `row` es el
+   * número de fila del Excel (la 1 es el encabezado).
+   *
+   * Categoría y marca aceptan ID numérico **o nombre de texto** (los IDs
+   * cambian entre entornos; el texto se resuelve por nombre, case-insensitive).
+   */
+  async bulkCreate(rows: CreateProductDto[]): Promise<{
+    total: number;
+    created: number;
+    failed: number;
+    results: { row: number; name?: string; success: boolean; id?: number; error?: string }[];
+  }> {
+    const results: { row: number; name?: string; success: boolean; id?: number; error?: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] ?? ({} as CreateProductDto);
+      const excelRow = i + 2; // fila 1 = encabezados de la plantilla
+      try {
+        // ── Categoría / marca: por ID o por nombre ──
+        const categoryId = await this.resolveCategoryId(row);
+        const marcaId = await this.resolveMarcaId(row, categoryId);
+
+        const missing: string[] = [];
+        if (!row.name || !String(row.name).trim()) missing.push('nombre');
+        if (row.price == null || Number.isNaN(Number(row.price))) missing.push('precio');
+        if (row.totalMl == null || Number.isNaN(Number(row.totalMl))) missing.push('total_ml');
+        if (categoryId == null) missing.push('categoria (ID o nombre)');
+        if (marcaId == null) missing.push('marca (ID o nombre)');
+        if (missing.length) {
+          throw new BadRequestException(`Faltan campos obligatorios: ${missing.join(', ')}`);
+        }
+
+        const created = await this.create({
+          ...row,
+          name: String(row.name).trim(),
+          price: Number(row.price),
+          totalMl: Number(row.totalMl),
+          // El chequeo de `missing` ya garantizó que no son null.
+          categoryId: categoryId!,
+          marcaId: marcaId!,
+        });
+        results.push({ row: excelRow, name: row.name, success: true, id: Number(created.id) });
+      } catch (error: any) {
+        const message =
+          error?.response?.message ?? error?.message ?? 'Error desconocido';
+        results.push({
+          row: excelRow,
+          name: row?.name,
+          success: false,
+          error: Array.isArray(message) ? message.join('; ') : String(message),
+        });
+      }
+    }
+
+    return {
+      total: rows.length,
+      created: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
+    };
+  }
+
+  /** categoryId numérico directo; si no, busca la categoría por nombre. */
+  private async resolveCategoryId(row: any): Promise<number | null> {
+    if (row.categoryId != null && !Number.isNaN(Number(row.categoryId))) {
+      return Number(row.categoryId);
+    }
+    const name = String(row.category ?? row.categoryId ?? '').trim();
+    if (!name) return null;
+    const found = await this.dataSource.getRepository(Category).findOne({
+      where: { name: ILike(name) },
+    });
+    if (!found) {
+      throw new BadRequestException(`La categoría "${name}" no existe — créala primero en el admin`);
+    }
+    return Number(found.id);
+  }
+
+  /** marcaId numérico directo; si no, busca la marca por nombre (dentro de la
+      categoría resuelta cuando hay). */
+  private async resolveMarcaId(row: any, categoryId: number | null): Promise<number | null> {
+    if (row.marcaId != null && !Number.isNaN(Number(row.marcaId))) {
+      return Number(row.marcaId);
+    }
+    const name = String(row.marca ?? row.marcaId ?? '').trim();
+    if (!name) return null;
+    const found = await this.dataSource.getRepository(Marca).findOne({
+      where: {
+        name: ILike(name),
+        ...(categoryId != null ? { categoryId } : {}),
+      } as any,
+    });
+    if (!found) {
+      throw new BadRequestException(`La marca "${name}" no existe — créala primero en el admin`);
+    }
+    return Number(found.id);
   }
 
   /**
@@ -124,7 +226,7 @@ export class ProductsService {
       search,
       minPrice,
       maxPrice,
-      isActive = true,
+      isActive,
       bajoPedido,
       gender,
       timeOfDay,
@@ -165,9 +267,14 @@ export class ProductsService {
       queryBuilder.andWhere('product.price <= :maxPrice', { maxPrice });
     }
 
-    if (isActive !== undefined) {
-      queryBuilder.andWhere('product.isActive = :isActive', { isActive });
-    }
+    // isActive llega como string ("true"/"false"); ausente → solo activos.
+    const isActiveFilter =
+      isActive === undefined || isActive === null || isActive === ''
+        ? true
+        : String(isActive) === 'true';
+    queryBuilder.andWhere('product.isActive = :isActive', {
+      isActive: isActiveFilter,
+    });
 
     if (bajoPedido !== undefined && bajoPedido !== null) {
       const bajoPedidoBool = String(bajoPedido) === 'true';
@@ -217,7 +324,17 @@ export class ProductsService {
     if (productIds.length > 0) {
       const variations = await this.variationsRepository.find({
         where: { productId: In(productIds), isActive: true },
-        select: ['id', 'productId', 'mlSize', 'price', 'isFullBottle'],
+        // Imágenes de la variante: la card del front cambia la foto según el
+        // formato elegido, así que el listado debe traerlas.
+        relations: ['images'],
+        select: {
+          id: true,
+          productId: true,
+          mlSize: true,
+          price: true,
+          isFullBottle: true,
+          images: { id: true, url: true, displayOrder: true, isActive: true },
+        },
       });
 
       const byProduct = new Map<string, ProductVariation[]>();
@@ -240,12 +357,19 @@ export class ProductsService {
           (product as any).minFormatPrice = Math.min(...prices);
           (product as any).maxFormatPrice = Math.max(...prices);
         }
-        (product as any).formats = vs.map((v) => ({
-          id: v.id,
-          ml: Number(v.mlSize),
-          price: Number(v.price),
-          isFullBottle: !!v.isFullBottle,
-        }));
+        (product as any).formats = vs.map((v) => {
+          // Primera imagen activa de la variante (por displayOrder).
+          const images = (v.images ?? [])
+            .filter((img: any) => img?.isActive !== false && img?.url)
+            .sort((a: any, b: any) => Number(a.displayOrder ?? 0) - Number(b.displayOrder ?? 0));
+          return {
+            id: v.id,
+            ml: Number(v.mlSize),
+            price: Number(v.price),
+            isFullBottle: !!v.isFullBottle,
+            imageUrl: images[0]?.url ?? undefined,
+          };
+        });
       }
     }
 

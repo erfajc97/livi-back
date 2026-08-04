@@ -112,7 +112,7 @@ export class ProductResponseDto {
     required: false,
     description: 'Compact list of active formats (bottle + decants) for cards',
   })
-  formats?: { id: number; ml: number; price: number; isFullBottle: boolean }[];
+  formats?: { id: number; ml: number; price: number; isFullBottle: boolean; imageUrl?: string }[];
 
   @ApiProperty({ type: [ProductVariationResponseDto], required: false })
   variations?: ProductVariationResponseDto[];
@@ -189,12 +189,18 @@ export class ProductResponseDto {
     this.formats =
       product.formats ??
       (product.variations?.length
-        ? product.variations.map((v: any) => ({
-            id: Number(v.id),
-            ml: Number(v.mlSize),
-            price: Number(v.price),
-            isFullBottle: !!v.isFullBottle,
-          }))
+        ? product.variations.map((v: any) => {
+            const images = (v.images ?? [])
+              .filter((img: any) => img?.isActive !== false && img?.url)
+              .sort((a: any, b: any) => Number(a.displayOrder ?? 0) - Number(b.displayOrder ?? 0));
+            return {
+              id: Number(v.id),
+              ml: Number(v.mlSize),
+              price: Number(v.price),
+              isFullBottle: !!v.isFullBottle,
+              imageUrl: images[0]?.url ?? undefined,
+            };
+          })
         : undefined);
     this.createdAt = product.createdAt;
     this.updatedAt = product.updatedAt;

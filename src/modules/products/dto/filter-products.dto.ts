@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, IsEnum, IsBoolean, Min } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsEnum, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
@@ -36,11 +36,11 @@ export class FilterProductsDto extends PaginationDto {
   @Min(0)
   maxPrice?: number;
 
-  @ApiPropertyOptional({ example: true, description: 'Filter by active status', default: true })
+  @ApiPropertyOptional({ example: true, description: 'Filter by active status ("true"/"false", default: true)' })
   @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  isActive?: boolean;
+  // String a propósito (como bajoPedido): con enableImplicitConversion, un
+  // boolean DTO convertiría el query param 'false' en true. Se parsea en el service.
+  isActive?: string;
 
   @ApiPropertyOptional({ example: false, description: 'Filter by bajo pedido status' })
   @IsOptional()

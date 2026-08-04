@@ -33,7 +33,7 @@ export class LandingSectionsService {
 
   async findAll(): Promise<LandingSection[]> {
     return this.landingSectionsRepository.find({
-      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations'],
+      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations', 'products.variations.images'],
       order: { order: 'ASC' },
     });
   }
@@ -42,7 +42,7 @@ export class LandingSectionsService {
   async findActive(placement?: SectionPlacement): Promise<LandingSection[]> {
     return this.landingSectionsRepository.find({
       where: { isActive: true, ...(placement ? { placement } : {}) },
-      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations'],
+      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations', 'products.variations.images'],
       order: { order: 'ASC' },
     });
   }
@@ -50,7 +50,7 @@ export class LandingSectionsService {
   async findOne(id: number): Promise<LandingSection> {
     const section = await this.landingSectionsRepository.findOne({
       where: { id },
-      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations'],
+      relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations', 'products.variations.images'],
     });
 
     if (!section) {
@@ -90,7 +90,8 @@ export class LandingSectionsService {
     }
 
     // Check if product is already in section
-    const existingProduct = section.products.find(p => p.id === productId);
+    // Ojo: Product.id es bigint y llega como string — comparar normalizado.
+    const existingProduct = section.products.find(p => Number(p.id) === Number(productId));
     if (existingProduct) {
       throw new BadRequestException(`Product ${productId} is already in this section`);
     }
@@ -101,7 +102,9 @@ export class LandingSectionsService {
 
   async removeProduct(id: number, productId: number): Promise<LandingSection> {
     const section = await this.findOne(id);
-    section.products = section.products.filter(p => p.id !== productId);
+    // Product.id es bigint (string en runtime): con !== numérico nunca
+    // coincidía y el producto no se removía de la sección.
+    section.products = section.products.filter(p => Number(p.id) !== Number(productId));
     return this.landingSectionsRepository.save(section);
   }
 

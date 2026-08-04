@@ -47,6 +47,20 @@ export class ProductsController {
     return this.productsService.create(createProductDto);
   }
 
+  @Post('bulk-import')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Importación masiva de productos',
+    description:
+      'Crea productos en lote (p. ej. desde la plantilla Excel del admin). Cada fila se procesa de forma independiente: las que fallan no detienen el lote y se reportan por número de fila.',
+  })
+  @ApiResponse({ status: 201, description: 'Resultado fila por fila de la importación' })
+  bulkImport(@Body() body: { products: CreateProductDto[] }) {
+    return this.productsService.bulkCreate(body?.products ?? []);
+  }
+
   @Post(':id/signature-image')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
