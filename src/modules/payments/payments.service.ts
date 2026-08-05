@@ -19,6 +19,8 @@ import { OrderStatusHistory } from '../orders/entities/order-status-history.enti
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { OrderNotificationService } from '../../common/services/order-notification.service';
 import { CouponsService } from '../coupons/coupons.service';
+import { UsersService } from '../users/users.service';
+import { EmailService } from '../email/email.service';
 
 const PAYPHONE_SURCHARGE_RATE = 0.06; // 6%
 
@@ -39,6 +41,8 @@ export class PaymentsService {
     private stockService: StockService,
     private orderNotificationService: OrderNotificationService,
     private couponsService: CouponsService,
+    private usersService: UsersService,
+    private emailService: EmailService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -47,6 +51,58 @@ export class PaymentsService {
       .toString()
       .padStart(6, '0');
     return `ND-${year}-${random}`;
+  }
+
+  /**
+   * Vincula una orden guest a la cuenta del email del comprador: si ya existe
+   * un usuario con ese email, adopta la orden (y cualquier otra huérfana con
+   * el mismo email); si no existe, crea la cuenta con contraseña temporal y
+   * se la envía por correo. Fire-and-forget desde el checkout.
+   */
+  private async claimGuestOrder(order: Order): Promise<void> {
+    const email = order.customerEmail?.trim();
+    if (!email) return;
+
+    const existing = await this.dataSource
+      .getRepository(User)
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = LOWER(:email)', { email })
+      .getOne();
+
+    let userId: number;
+    let credentials: { firstName: string; password: string } | null = null;
+
+    if (existing) {
+      userId = Number(existing.id);
+    } else {
+      const [firstName, ...rest] = (order.customerName || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const created = await this.usersService.createGuestAccount({
+        email,
+        firstName: firstName || 'Cliente',
+        lastName: rest.join(' '),
+      });
+      userId = Number(created.user.id);
+      credentials = {
+        firstName: created.user.firstName,
+        password: created.plainPassword,
+      };
+    }
+
+    // Adopta esta orden y cualquier otra guest previa con el mismo email.
+    await this.dataSource.query(
+      `UPDATE "orders" SET "userId" = $1
+       WHERE "userId" IS NULL AND LOWER("customerEmail") = LOWER($2)`,
+      [userId, email],
+    );
+
+    if (credentials) {
+      await this.emailService
+        .sendGuestAccountEmail(email, credentials.firstName, credentials.password)
+        .catch(() => {});
+    }
   }
 
   /**
@@ -247,6 +303,13 @@ export class PaymentsService {
       await queryRunner.manager.save(OrderStatusHistory, historyEntry);
 
       await queryRunner.commitTransaction();
+
+      // Guest checkout: la orden llega sin dueño. Se vincula a la cuenta del
+      // email del comprador (creándola con contraseña temporal la primera
+      // vez y enviándosela por correo). Best-effort: nunca rompe la compra.
+      if (!user && savedOrder.customerEmail) {
+        this.claimGuestOrder(savedOrder).catch(() => {});
+      }
 
       // Registrar uso del cupón (incrementa currentUses) — best effort.
       // Solo para usuarios con sesión: recordUsage necesita userId. En guest

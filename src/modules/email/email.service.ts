@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getVerificationEmailHtml } from './templates/verification-email';
 import { getPasswordResetEmailHtml } from './templates/password-reset-email';
+import { getGuestAccountEmailHtml } from './templates/guest-account-email';
 
 @Injectable()
 export class EmailService {
@@ -88,6 +89,40 @@ export class EmailService {
     } catch (error) {
       this.logger.error(
         `Failed to send password reset email to ${email}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Credenciales de la cuenta creada automáticamente en un guest checkout.
+   * Incluye la contraseña temporal — por eso solo se envía una vez, al crear.
+   */
+  async sendGuestAccountEmail(
+    email: string,
+    firstName: string,
+    password: string,
+  ): Promise<void> {
+    const loginUrl = `${this.frontendUrl}/mi-cuenta`;
+
+    if (!this.sgMail) {
+      this.logger.log(
+        `[DEV] Guest account email for ${email} — contraseña temporal: ${password}`,
+      );
+      return;
+    }
+
+    try {
+      await this.sgMail.send({
+        to: email,
+        from: { email: this.fromEmail, name: 'NönDecants' },
+        subject: 'Tu cuenta de NönDecants está lista — NönDecants',
+        html: getGuestAccountEmailHtml(firstName, email, password, loginUrl),
+      });
+      this.logger.log(`Guest account email sent to ${email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send guest account email to ${email}`,
         error,
       );
     }

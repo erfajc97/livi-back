@@ -10,6 +10,7 @@ import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
@@ -114,7 +115,11 @@ export class AuthService {
   }
 
   async verifyEmail(token: string): Promise<{ message: string }> {
-    await this.usersService.verifyEmail(token);
+    const user = await this.usersService.verifyEmail(token);
+
+    // Reclama cualquier orden guest previa hecha con este email.
+    await this.linkGuestOrders(user.id, user.email);
+
     return {
       message: 'Email verificado exitosamente. Ya puedes iniciar sesión.',
     };
@@ -161,6 +166,18 @@ export class AuthService {
   ): Promise<{ message: string }> {
     await this.usersService.resetPassword(token, newPassword);
     return { message: 'Contraseña restablecida exitosamente.' };
+  }
+
+  async changePassword(
+    userId: number,
+    dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    await this.usersService.changePassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    return { message: 'Contraseña actualizada exitosamente.' };
   }
 
   async googleLogin(idToken: string): Promise<AuthResponseDto> {

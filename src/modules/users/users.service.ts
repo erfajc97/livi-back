@@ -95,6 +95,33 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
+  /**
+   * Cuenta automática para guest checkout: se crea con una contraseña
+   * temporal legible que se envía por email; el usuario la cambia cuando
+   * quiera desde su perfil o con "olvidé mi contraseña".
+   * Devuelve la contraseña en plano SOLO para poder enviarla por correo.
+   */
+  async createGuestAccount(data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<{ user: User; plainPassword: string }> {
+    const plainPassword = `Nd-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+    const user = this.usersRepository.create({
+      email: data.email,
+      password: hashedPassword,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: Role.CLIENT,
+      isEmailVerified: false,
+      authProvider: 'local',
+    });
+
+    return { user: await this.usersRepository.save(user), plainPassword };
+  }
+
   async setVerificationToken(userId: number): Promise<string> {
     const token = crypto.randomBytes(32).toString('hex');
     const expiry = new Date();
@@ -108,7 +135,7 @@ export class UsersService {
     return token;
   }
 
-  async verifyEmail(token: string): Promise<void> {
+  async verifyEmail(token: string): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { emailVerificationToken: token },
     });
@@ -129,6 +156,8 @@ export class UsersService {
       emailVerificationToken: null,
       emailVerificationTokenExpiry: null,
     });
+
+    return user;
   }
 
   async markEmailVerified(userId: number): Promise<void> {
@@ -192,6 +221,32 @@ export class UsersService {
       passwordResetToken: null,
       passwordResetTokenExpiry: null,
     });
+  }
+
+  async changePassword(
+    userId: number,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (user.authProvider === 'google') {
+      throw new BadRequestException(
+        'Tu cuenta usa Google — no tiene contraseña local',
+      );
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      throw new BadRequestException('La contraseña actual no es correcta');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.usersRepository.update(userId, { password: hashedPassword });
   }
 
   async findAll(): Promise<UserResponseDto[]> {

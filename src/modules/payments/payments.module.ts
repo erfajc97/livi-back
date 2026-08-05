@@ -12,12 +12,16 @@ import { ProductVariation } from '../products/entities/product-variation.entity'
 import { OrderStatusHistory } from '../orders/entities/order-status-history.entity';
 import { ProductsModule } from '../products/products.module';
 import { CouponsModule } from '../coupons/coupons.module';
+import { UsersModule } from '../users/users.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, OrderItem, OrderStatusHistory, Product, ProductVariation]),
     ProductsModule,
     CouponsModule,
+    UsersModule,
+    EmailModule,
   ],
   controllers: [PaymentsController],
   providers: [PaymentsService, PayPhoneService, S3Service, OrderNotificationService],
