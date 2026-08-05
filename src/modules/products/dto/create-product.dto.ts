@@ -43,6 +43,40 @@ class ScentSectionDto {
   description?: string;
 }
 
+// ── Variación (decant o botella) para creación/importación ──
+export class CreateProductVariantDto {
+  @ApiProperty({ example: 5, description: 'Tamaño en ml (3, 5, 10… o ml de la botella)' })
+  @IsNumber()
+  @Min(0)
+  mlSize: number;
+
+  @ApiProperty({ example: 23.75, description: 'Precio de esta variación', minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  price: number;
+
+  @ApiPropertyOptional({ example: 12.5, description: 'Costo de adquisición de la variación', minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  cost?: number;
+
+  @ApiPropertyOptional({ example: 'Sauvage Elixir - Decant 5ml', description: 'Nombre visible; se genera si viene vacío' })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional({ example: false, description: 'true = botella sellada completa', default: false })
+  @IsBoolean()
+  @IsOptional()
+  isFullBottle?: boolean;
+
+  @ApiPropertyOptional({ example: true, default: true })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+}
+
 export class CreateProductDto {
   @ApiProperty({ example: 'Paco Rabanne', description: 'Product name' })
   @IsString()
@@ -192,4 +226,11 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   signatureImageUrl?: string;
+
+  @ApiPropertyOptional({ type: [CreateProductVariantDto], description: 'Variaciones (decants) a crear junto al producto. La botella completa se crea siempre automáticamente.' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductVariantDto)
+  @IsOptional()
+  variants?: CreateProductVariantDto[];
 }

@@ -7,7 +7,7 @@ import { BottleEvent } from './entities/bottle-event.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
 import { Category } from '../categories/entities/category.entity';
 import { Marca } from '../categories/entities/marca.entity';
-import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductDto, CreateProductVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { FilterProductsDto } from './dto/filter-products.dto';
@@ -26,14 +26,51 @@ export class ProductsService {
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<ProductResponseDto> {
-    const product = this.productsRepository.create(createProductDto);
+    const { variants, ...productData } = createProductDto;
+    const product = this.productsRepository.create(productData);
     const savedProduct = await this.productsRepository.save(product);
+
+    // Variaciones enviadas en el alta (importación Excel: decants 3/5/10 ml, etc.)
+    if (variants?.length) {
+      await this.createVariantsFromDto(savedProduct, variants);
+    }
 
     // Ensure every product has at least one full-bottle variation so manual
     // sales and orders always have a canonical sellable unit for the bottle.
     await this.ensureFullBottleVariation(savedProduct);
 
     return this.findOne(savedProduct.id);
+  }
+
+  /** Crea las variaciones (decants o botella) enviadas en el alta del producto. */
+  private async createVariantsFromDto(
+    product: Product,
+    variants: CreateProductVariantDto[],
+  ): Promise<void> {
+    const slug = (product.name || 'product')
+      .toString()
+      .replace(/\s+/g, '-')
+      .toLowerCase()
+      .slice(0, 40);
+    const rows = variants
+      .filter((v) => v && v.mlSize != null && v.price != null)
+      .map((v, i) =>
+        this.variationsRepository.create({
+          productId: product.id,
+          isFullBottle: !!v.isFullBottle,
+          mlSize: Number(v.mlSize),
+          price: Number(v.price),
+          cost: v.cost != null ? Number(v.cost) : undefined,
+          name:
+            v.name?.trim() ||
+            `${product.name} - ${v.isFullBottle ? 'Botella' : 'Decant'} ${v.mlSize}ml`,
+          sku: `${slug}-${v.isFullBottle ? 'bottle' : 'decant'}-${v.mlSize}ml-${product.id}${i > 0 ? `-${i}` : ''}`,
+          isActive: v.isActive ?? true,
+        }),
+      );
+    if (rows.length) {
+      await this.variationsRepository.save(rows);
+    }
   }
 
   /**
