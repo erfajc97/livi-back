@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ProductImageResponseDto } from './product-image-response.dto';
 import { ProductVideoResponseDto } from './product-video-response.dto';
+import { PresentationType } from '../entities/product-variation.entity';
 
 export class ProductVariationResponseDto {
   @ApiProperty()
@@ -14,6 +15,12 @@ export class ProductVariationResponseDto {
 
   @ApiProperty({ description: 'Whether this is a full sealed bottle variation' })
   isFullBottle: boolean;
+
+  @ApiProperty({
+    enum: PresentationType,
+    description: "Tipo de presentación: 'decant' | 'sellada' | 'original'",
+  })
+  presentationType: PresentationType;
 
   @ApiProperty({ required: false })
   price?: number;
@@ -61,6 +68,10 @@ export class ProductVariationResponseDto {
     this.productId = variation.productId;
     this.mlSize = Number(variation.mlSize || 0);
     this.isFullBottle = variation.isFullBottle ?? false;
+    // Fallback para registros antiguos o payloads parciales sin la columna.
+    this.presentationType =
+      variation.presentationType ??
+      (this.isFullBottle ? PresentationType.SELLADA : PresentationType.DECANT);
     this.price = variation.price;
     this.cost = variation.cost ?? undefined;
     this.sku = variation.sku;

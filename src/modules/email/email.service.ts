@@ -3,12 +3,29 @@ import { ConfigService } from '@nestjs/config';
 import { getVerificationEmailHtml } from './templates/verification-email';
 import { getPasswordResetEmailHtml } from './templates/password-reset-email';
 import { getGuestAccountEmailHtml } from './templates/guest-account-email';
+import { getOrderConfirmationEmailHtml } from './templates/order-confirmation-email';
+import {
+  getTransferApprovedEmailHtml,
+  getTransferReceivedEmailHtml,
+  getTransferRejectedEmailHtml,
+} from './templates/transfer-emails';
+import {
+  getOrderShippedEmailHtml,
+  ShipmentKind,
+} from './templates/order-shipped-email';
+import { getOrderDeliveredEmailHtml } from './templates/order-delivered-email';
+import { getAbandonedCartEmailHtml } from './templates/abandoned-cart-email';
+import { getWelcomeEmailHtml } from './templates/welcome-email';
+import { getAdminNewOrderEmailHtml } from './templates/admin-new-order-email';
+import { BRAND_NAME } from './templates/base-layout';
+import { OrderEmailData, OrderEmailItem } from './email.types';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly fromEmail: string;
   private readonly frontendUrl: string;
+  private readonly adminEmail: string;
   private sgMail: any = null;
 
   constructor(private configService: ConfigService) {
@@ -28,12 +45,47 @@ export class EmailService {
         'SENDGRID_API_KEY not configured, emails will be logged only',
       );
     }
+    // Matriz de mailing: todos los correos al cliente salen desde
+    // contacto@nondecants.com (requiere SPF/DKIM del dominio bien configurados).
     this.fromEmail =
       this.configService.get<string>('SENDGRID_FROM_EMAIL') ||
-      'noreply@nondecants.com';
+      'contacto@nondecants.com';
     this.frontendUrl =
       this.configService.get<string>('FRONTEND_URL') ||
       'http://localhost:4321';
+    // M-13: alerta interna de pedidos nuevos.
+    this.adminEmail =
+      this.configService.get<string>('ADMIN_EMAIL') || 'nondecants@gmail.com';
+  }
+
+  /**
+   * Envío genérico. Sin SendGrid configurado solo registra en log (DEV).
+   * Nunca lanza: un correo fallido no debe romper el flujo de negocio.
+   */
+  private async send(
+    to: string,
+    subject: string,
+    html: string,
+    logLabel: string,
+  ): Promise<void> {
+    if (!to) return;
+
+    if (!this.sgMail) {
+      this.logger.log(`[DEV] ${logLabel} para ${to}: "${subject}"`);
+      return;
+    }
+
+    try {
+      await this.sgMail.send({
+        to,
+        from: { email: this.fromEmail, name: BRAND_NAME },
+        subject,
+        html,
+      });
+      this.logger.log(`${logLabel} enviado a ${to}`);
+    } catch (error) {
+      this.logger.error(`Fallo al enviar ${logLabel} a ${to}`, error);
+    }
   }
 
   async sendVerificationEmail(
@@ -42,28 +94,12 @@ export class EmailService {
     token: string,
   ): Promise<void> {
     const verificationUrl = `${this.frontendUrl}/verificar-email?token=${token}`;
-
-    if (!this.sgMail) {
-      this.logger.log(
-        `[DEV] Verification email for ${email}: ${verificationUrl}`,
-      );
-      return;
-    }
-
-    try {
-      await this.sgMail.send({
-        to: email,
-        from: { email: this.fromEmail, name: 'NönDecants' },
-        subject: 'Verifica tu email — NönDecants',
-        html: getVerificationEmailHtml(firstName, verificationUrl),
-      });
-      this.logger.log(`Verification email sent to ${email}`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to send verification email to ${email}`,
-        error,
-      );
-    }
+    await this.send(
+      email,
+      'Verifica tu email — NonDecants',
+      getVerificationEmailHtml(firstName, verificationUrl),
+      'Correo de verificación',
+    );
   }
 
   async sendPasswordResetEmail(
@@ -72,26 +108,12 @@ export class EmailService {
     token: string,
   ): Promise<void> {
     const resetUrl = `${this.frontendUrl}/restablecer-contrasena?token=${token}`;
-
-    if (!this.sgMail) {
-      this.logger.log(`[DEV] Password reset email for ${email}: ${resetUrl}`);
-      return;
-    }
-
-    try {
-      await this.sgMail.send({
-        to: email,
-        from: { email: this.fromEmail, name: 'NönDecants' },
-        subject: 'Restablecer contraseña — NönDecants',
-        html: getPasswordResetEmailHtml(firstName, resetUrl),
-      });
-      this.logger.log(`Password reset email sent to ${email}`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to send password reset email to ${email}`,
-        error,
-      );
-    }
+    await this.send(
+      email,
+      'Restablecer contraseña — NonDecants',
+      getPasswordResetEmailHtml(firstName, resetUrl),
+      'Correo de restablecimiento de contraseña',
+    );
   }
 
   /**
@@ -104,27 +126,120 @@ export class EmailService {
     password: string,
   ): Promise<void> {
     const loginUrl = `${this.frontendUrl}/mi-cuenta`;
+    await this.send(
+      email,
+      'Tu cuenta de NonDecants está lista — NonDecants',
+      getGuestAccountEmailHtml(firstName, email, password, loginUrl),
+      'Correo de cuenta guest',
+    );
+  }
 
-    if (!this.sgMail) {
-      this.logger.log(
-        `[DEV] Guest account email for ${email} — contraseña temporal: ${password}`,
-      );
-      return;
-    }
+  /** M-10 · Cuenta creada → bienvenida. */
+  async sendWelcomeEmail(email: string, firstName: string): Promise<void> {
+    await this.send(
+      email,
+      'Bienvenido a NonDecants — NonDecants',
+      getWelcomeEmailHtml(firstName, this.frontendUrl),
+      'Correo de bienvenida',
+    );
+  }
 
-    try {
-      await this.sgMail.send({
-        to: email,
-        from: { email: this.fromEmail, name: 'NönDecants' },
-        subject: 'Tu cuenta de NönDecants está lista — NönDecants',
-        html: getGuestAccountEmailHtml(firstName, email, password, loginUrl),
-      });
-      this.logger.log(`Guest account email sent to ${email}`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to send guest account email to ${email}`,
-        error,
-      );
-    }
+  /** M-01 · Pedido con tarjeta aprobado → confirmación con detalle. */
+  async sendOrderConfirmationEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      data.customerEmail,
+      `Pedido confirmado ${data.orderNumber} — NonDecants`,
+      getOrderConfirmationEmailHtml(data),
+      'Confirmación de pedido (M-01)',
+    );
+  }
+
+  /** M-02 · Transferencia creada (comprobante subido, sin validar) → acuse. */
+  async sendTransferReceivedEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      data.customerEmail,
+      `Recibimos tu orden ${data.orderNumber} — NonDecants`,
+      getTransferReceivedEmailHtml(data),
+      'Acuse de transferencia (M-02)',
+    );
+  }
+
+  /** M-03 · Transferencia aprobada por admin. */
+  async sendTransferApprovedEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      data.customerEmail,
+      `Pedido confirmado ${data.orderNumber} — NonDecants`,
+      getTransferApprovedEmailHtml(data),
+      'Transferencia aprobada (M-03)',
+    );
+  }
+
+  /** M-04 · Transferencia rechazada por admin. */
+  async sendTransferRejectedEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      data.customerEmail,
+      `No pudimos validar tu pago — orden ${data.orderNumber} — NonDecants`,
+      getTransferRejectedEmailHtml(data),
+      'Transferencia rechazada (M-04)',
+    );
+  }
+
+  /**
+   * M-05 / M-06 / M-07 · Guía Servientrega generada → despacho + tracking.
+   * `kind`: 'full' pedido completo, 'partial' primer envío de pedido mixto,
+   * 'backorder' segunda guía con los productos bajo pedido.
+   */
+  async sendOrderShippedEmail(
+    data: OrderEmailData,
+    trackingCode: string,
+    kind: ShipmentKind,
+  ): Promise<void> {
+    const subject =
+      kind === 'backorder'
+        ? `Tu pedido ${data.orderNumber} fue despachado (segundo envío) — NonDecants`
+        : `Tu pedido ${data.orderNumber} fue despachado — NonDecants`;
+    await this.send(
+      data.customerEmail,
+      subject,
+      getOrderShippedEmailHtml(data, trackingCode, kind),
+      `Guía de despacho (M-05/06/07, ${kind})`,
+    );
+  }
+
+  /** M-08 · Servientrega marca "entregado" → carta de agradecimiento. */
+  async sendOrderDeliveredEmail(
+    email: string,
+    customerName: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Tu perfume ha llegado — NonDecants',
+      getOrderDeliveredEmailHtml(customerName),
+      'Carta de agradecimiento (M-08)',
+    );
+  }
+
+  /** M-09 · Carrito abandonado (solo clientes registrados). */
+  async sendAbandonedCartEmail(
+    email: string,
+    firstName: string,
+    items: OrderEmailItem[],
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Tu carrito te espera — NonDecants',
+      getAbandonedCartEmailHtml(firstName, items, this.frontendUrl),
+      'Recordatorio de carrito abandonado (M-09)',
+    );
+  }
+
+  /** M-13 · Alerta interna de pedido nuevo a nondecants@gmail.com. */
+  async sendAdminNewOrderEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      this.adminEmail,
+      `Nueva orden ${data.orderNumber} — $${Number(data.total || 0).toFixed(2)}`,
+      getAdminNewOrderEmailHtml(data),
+      'Alerta interna de pedido (M-13)',
+    );
   }
 }

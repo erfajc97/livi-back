@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
+import { PresentationType } from '../entities/product-variation.entity';
 import { ProductVariationResponseDto } from './product-variation-response.dto';
 import { ProductImageResponseDto } from './product-image-response.dto';
 import { ProductVideoResponseDto } from './product-video-response.dto';
@@ -112,7 +113,7 @@ export class ProductResponseDto {
     required: false,
     description: 'Compact list of active formats (bottle + decants) for cards',
   })
-  formats?: { id: number; ml: number; price: number; isFullBottle: boolean; imageUrl?: string }[];
+  formats?: { id: number; ml: number; price: number; isFullBottle: boolean; presentationType?: PresentationType; imageUrl?: string }[];
 
   @ApiProperty({ type: [ProductVariationResponseDto], required: false })
   variations?: ProductVariationResponseDto[];
@@ -198,6 +199,9 @@ export class ProductResponseDto {
               ml: Number(v.mlSize),
               price: Number(v.price),
               isFullBottle: !!v.isFullBottle,
+              presentationType:
+                v.presentationType ??
+                (v.isFullBottle ? PresentationType.SELLADA : PresentationType.DECANT),
               imageUrl: images[0]?.url ?? undefined,
             };
           })

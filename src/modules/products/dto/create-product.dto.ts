@@ -14,6 +14,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
+import { PresentationType } from '../entities/product-variation.entity';
 
 // ── Perfil olfativo (secciones anidadas) ──
 class ScentNoteDto {
@@ -70,6 +71,16 @@ export class CreateProductVariantDto {
   @IsBoolean()
   @IsOptional()
   isFullBottle?: boolean;
+
+  @ApiPropertyOptional({
+    enum: PresentationType,
+    example: PresentationType.DECANT,
+    description: "Tipo de presentación: 'decant' | 'sellada' | 'original' (50ml, 100ml, etc.). Si no viene, se deriva de isFullBottle.",
+    default: PresentationType.DECANT,
+  })
+  @IsEnum(PresentationType)
+  @IsOptional()
+  presentationType?: PresentationType;
 
   @ApiPropertyOptional({ example: true, default: true })
   @IsBoolean()

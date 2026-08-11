@@ -1,5 +1,6 @@
 // Centralized entity imports to avoid Node.js 24 experimental TypeScript issues
 import { User } from '../modules/users/entities/user.entity';
+import { UserAddress } from '../modules/users/entities/user-address.entity';
 import { Product } from '../modules/products/entities/product.entity';
 import { ProductOption } from '../modules/products/entities/product-option.entity';
 import { ProductOptionValue } from '../modules/products/entities/product-option-value.entity';
@@ -33,6 +34,7 @@ import { Campaign } from '../modules/newsletter/entities/campaign.entity';
 
 export const entities = [
   User,
+  UserAddress,
   Product,
   ProductOption,
   ProductOptionValue,

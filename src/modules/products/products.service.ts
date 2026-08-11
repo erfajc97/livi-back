@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, ILike } from 'typeorm';
 import { Product } from './entities/product.entity';
-import { ProductVariation } from './entities/product-variation.entity';
+import { ProductVariation, PresentationType } from './entities/product-variation.entity';
 import { BottleEvent } from './entities/bottle-event.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
 import { Category } from '../categories/entities/category.entity';
@@ -54,20 +54,28 @@ export class ProductsService {
       .slice(0, 40);
     const rows = variants
       .filter((v) => v && v.mlSize != null && v.price != null)
-      .map((v, i) =>
-        this.variationsRepository.create({
+      .map((v, i) => {
+        // Coherencia presentationType/isFullBottle igual que en
+        // ProductVariationsService: 'sellada'/'original' son botella completa.
+        const presentationType =
+          v.presentationType ??
+          (v.isFullBottle ? PresentationType.SELLADA : PresentationType.DECANT);
+        const isFullBottle =
+          v.isFullBottle ?? presentationType !== PresentationType.DECANT;
+        return this.variationsRepository.create({
           productId: product.id,
-          isFullBottle: !!v.isFullBottle,
+          isFullBottle,
+          presentationType,
           mlSize: Number(v.mlSize),
           price: Number(v.price),
           cost: v.cost != null ? Number(v.cost) : undefined,
           name:
             v.name?.trim() ||
-            `${product.name} - ${v.isFullBottle ? 'Botella' : 'Decant'} ${v.mlSize}ml`,
-          sku: `${slug}-${v.isFullBottle ? 'bottle' : 'decant'}-${v.mlSize}ml-${product.id}${i > 0 ? `-${i}` : ''}`,
+            `${product.name} - ${isFullBottle ? 'Botella' : 'Decant'} ${v.mlSize}ml`,
+          sku: `${slug}-${isFullBottle ? 'bottle' : 'decant'}-${v.mlSize}ml-${product.id}${i > 0 ? `-${i}` : ''}`,
           isActive: v.isActive ?? true,
-        }),
-      );
+        });
+      });
     if (rows.length) {
       await this.variationsRepository.save(rows);
     }
@@ -190,6 +198,7 @@ export class ProductsService {
     const variation = this.variationsRepository.create({
       productId: product.id,
       isFullBottle: true,
+      presentationType: PresentationType.SELLADA,
       mlSize: totalMl,
       price: product.price,
       name: `${product.name} - Botella ${totalMl}ml`,
@@ -370,6 +379,7 @@ export class ProductsService {
           mlSize: true,
           price: true,
           isFullBottle: true,
+          presentationType: true,
           images: { id: true, url: true, displayOrder: true, isActive: true },
         },
       });
@@ -404,6 +414,9 @@ export class ProductsService {
             ml: Number(v.mlSize),
             price: Number(v.price),
             isFullBottle: !!v.isFullBottle,
+            presentationType:
+              v.presentationType ??
+              (v.isFullBottle ? PresentationType.SELLADA : PresentationType.DECANT),
             imageUrl: images[0]?.url ?? undefined,
           };
         });
@@ -518,6 +531,9 @@ export class ProductsService {
         mlSize: Number(v.mlSize),
         price: Number(v.price ?? product.price),
         isFullBottle: v.isFullBottle,
+        presentationType:
+          v.presentationType ??
+          (v.isFullBottle ? PresentationType.SELLADA : PresentationType.DECANT),
         isActive: v.isActive,
       })),
       bottleEvents: bottleEvents.map((e) => ({

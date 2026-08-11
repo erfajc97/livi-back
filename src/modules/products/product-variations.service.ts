@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { ProductVariation } from './entities/product-variation.entity';
+import { ProductVariation, PresentationType } from './entities/product-variation.entity';
 import { ProductOptionValue } from './entities/product-option-value.entity';
 import { Product } from './entities/product.entity';
 import { CreateProductVariationDto } from './dto/create-product-variation.dto';
@@ -60,11 +60,23 @@ export class ProductVariationsService {
       }
     }
 
+    // presentationType e isFullBottle se mantienen coherentes: si solo viene
+    // uno, el otro se deriva ('sellada'/'original' son botella completa).
+    const presentationType =
+      createVariationDto.presentationType ??
+      (createVariationDto.isFullBottle
+        ? PresentationType.SELLADA
+        : PresentationType.DECANT);
+    const isFullBottle =
+      createVariationDto.isFullBottle ??
+      presentationType !== PresentationType.DECANT;
+
     const variation = this.variationsRepository.create({
       productId: createVariationDto.productId,
       price: createVariationDto.price,
       mlSize: createVariationDto.mlSize,
-      isFullBottle: createVariationDto.isFullBottle ?? false,
+      isFullBottle,
+      presentationType,
       sku: createVariationDto.sku,
       name: createVariationDto.name,
       isActive: createVariationDto.isActive ?? true,
@@ -152,6 +164,15 @@ export class ProductVariationsService {
     }
     if (updateVariationDto.isFullBottle !== undefined) {
       variation.isFullBottle = updateVariationDto.isFullBottle;
+    }
+    if (updateVariationDto.presentationType !== undefined) {
+      variation.presentationType = updateVariationDto.presentationType;
+      // 'sellada'/'original' son botella completa: alinear isFullBottle salvo
+      // que venga explícito en el mismo payload.
+      if (updateVariationDto.isFullBottle === undefined) {
+        variation.isFullBottle =
+          updateVariationDto.presentationType !== PresentationType.DECANT;
+      }
     }
     if (updateVariationDto.sku !== undefined) {
       variation.sku = updateVariationDto.sku;

@@ -5,9 +5,11 @@ import {
   IsBoolean,
   IsString,
   IsArray,
+  IsEnum,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PresentationType } from '../entities/product-variation.entity';
 
 export class CreateProductVariationDto {
   @ApiProperty({ description: 'Product ID this variation belongs to' })
@@ -25,6 +27,16 @@ export class CreateProductVariationDto {
   @IsBoolean()
   @IsOptional()
   isFullBottle?: boolean;
+
+  @ApiPropertyOptional({
+    enum: PresentationType,
+    example: PresentationType.DECANT,
+    description: "Tipo de presentación: 'decant' | 'sellada' | 'original' (50ml, 100ml, etc.). Si no viene, se deriva de isFullBottle. 'sellada'/'original' implican isFullBottle = true salvo que se envíe explícito.",
+    default: PresentationType.DECANT,
+  })
+  @IsEnum(PresentationType)
+  @IsOptional()
+  presentationType?: PresentationType;
 
   @ApiPropertyOptional({ example: 15.0, description: 'Override price for this variation', minimum: 0 })
   @IsNumber()

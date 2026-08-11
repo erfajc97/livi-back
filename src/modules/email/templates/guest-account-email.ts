@@ -16,8 +16,8 @@ export function getGuestAccountEmailHtml(
           <!-- Header -->
           <tr>
             <td style="padding:32px 40px 24px;text-align:center;border-bottom:1px solid #3A3636;">
-              <h1 style="margin:0;font-size:28px;font-weight:700;color:#CCB377;letter-spacing:2px;font-family:'Helvetica Neue',Arial,sans-serif;">
-                N&ouml;nDecants
+              <h1 style="margin:0;font-size:28px;font-weight:700;color:#CCB377;letter-spacing:2px;font-family:Georgia,'Times New Roman',serif;">
+                NonDecants
               </h1>
             </td>
           </tr>
@@ -28,7 +28,7 @@ export function getGuestAccountEmailHtml(
                 Creamos tu cuenta
               </h2>
               <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#A09A9A;">
-                Hola <strong style="color:#FFFFFF;">${firstName}</strong>, gracias por tu compra en N&ouml;nDecants.
+                Hola <strong style="color:#FFFFFF;">${firstName}</strong>, gracias por tu compra en NonDecants.
                 Para que puedas hacer seguimiento de esta y de tus pr&oacute;ximas &oacute;rdenes,
                 creamos una cuenta con tu correo. Estas son tus credenciales:
               </p>
@@ -59,6 +59,20 @@ export function getGuestAccountEmailHtml(
                 Te recomendamos cambiar la contrase&ntilde;a desde
                 <strong style="color:#FFFFFF;">Mi Cuenta</strong> cuando ingreses.
                 Si no hiciste esta compra, ignora este correo.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 40px;border-top:1px solid #3A3636;text-align:center;">
+              <p style="margin:0 0 6px;font-size:13px;color:#A09A9A;">
+                ¿Dudas? Escríbenos por
+                <a href="https://wa.me/593992305463" style="color:#CCB377;text-decoration:none;">WhatsApp 0992305463</a>
+                o a
+                <a href="mailto:contacto@nondecants.com" style="color:#CCB377;text-decoration:none;">contacto@nondecants.com</a>
+              </p>
+              <p style="margin:0;font-size:12px;color:#6E6868;">
+                NonDecants — Perfumes auténticos, Ecuador
               </p>
             </td>
           </tr>

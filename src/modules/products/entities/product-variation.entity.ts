@@ -16,6 +16,20 @@ import { ProductOptionValue } from './product-option-value.entity';
 import { ProductVariationImage } from './product-variation-image.entity';
 import { ProductVariationVideo } from './product-variation-video.entity';
 
+/**
+ * Tipo de presentación de la variante (REQ-056):
+ *  - decant:   decant fraccionado (3/5/10 ml…) — sale de la botella abierta.
+ *  - sellada:  botella sellada del formato estándar del producto (totalMl).
+ *  - original: presentación original alternativa (50ml, 100ml, etc.).
+ * `isFullBottle` sigue gobernando la lógica de inventario (sellada/original = true);
+ * este campo es la clasificación que elige el admin y que ve el cliente.
+ */
+export enum PresentationType {
+  DECANT = 'decant',
+  SELLADA = 'sellada',
+  ORIGINAL = 'original',
+}
+
 @Entity('product_variations')
 @Index(['productId'])
 export class ProductVariation {
@@ -61,6 +75,10 @@ export class ProductVariation {
   // Whether this variation represents a full sealed bottle
   @Column({ default: false })
   isFullBottle: boolean;
+
+  // Presentation type chosen in the admin (decant / sellada / original)
+  @Column({ type: 'enum', enum: PresentationType, default: PresentationType.DECANT })
+  presentationType: PresentationType;
 
   @Column({ default: true })
   isActive: boolean;
