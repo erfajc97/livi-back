@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In, ILike } from 'typeorm';
 import { Product } from './entities/product.entity';
@@ -471,16 +476,81 @@ export class ProductsService {
     return this.findOne(updatedProduct.id);
   }
 
+  /**
+   * Elimina un producto.
+   *
+   * Variaciones, imágenes, videos y eventos de botella caen por cascada, pero
+   * carritos, combos y pedidos apuntan al producto sin cascada: al borrarlo a
+   * secas Postgres rechazaba la operación y salía un 500 sin explicación.
+   *
+   * Un producto vendido no se borra nunca —rompería el histórico de pedidos—;
+   * en ese caso se responde 409 y el admin lo desactiva. Si solo está en
+   * carritos o combos, esas referencias se limpian y el producto se va.
+   */
   async remove(id: number): Promise<void> {
     const product = await this.productsRepository.findOne({
       where: { id },
+      relations: ['variations'],
     });
 
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    await this.productsRepository.remove(product);
+    const variationIds = (product.variations ?? []).map((v) => v.id);
+
+    const orderItemsQuery = this.dataSource
+      .getRepository(OrderItem)
+      .createQueryBuilder('oi')
+      .where('oi.productId = :id', { id });
+    if (variationIds.length) {
+      orderItemsQuery.orWhere('oi.productVariationId IN (:...variationIds)', { variationIds });
+    }
+    const soldCount = await orderItemsQuery.getCount();
+
+    if (soldCount > 0) {
+      throw new ConflictException(
+        `No se puede eliminar "${product.name}": tiene ${soldCount} ` +
+          `${soldCount === 1 ? 'pedido asociado' : 'pedidos asociados'} y se perdería el historial. ` +
+          'Desactívalo para que deje de aparecer en la tienda.',
+      );
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      // Carritos abiertos que lo tengan dentro
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('cart_items')
+        .where('productId = :id', { id })
+        .execute();
+
+      // Combos que lo incluyen (el combo queda sin ese ítem, no se borra)
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('combo_products')
+        .where('productId = :id', { id })
+        .execute();
+
+      if (variationIds.length) {
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from('cart_items')
+          .where('productVariationId IN (:...variationIds)', { variationIds })
+          .execute();
+
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from('combo_products')
+          .where('productVariationId IN (:...variationIds)', { variationIds })
+          .execute();
+      }
+
+      await manager.remove(product);
+    });
   }
 
   /**
