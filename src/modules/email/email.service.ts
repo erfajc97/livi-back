@@ -50,9 +50,25 @@ export class EmailService {
     this.fromEmail =
       this.configService.get<string>('SENDGRID_FROM_EMAIL') ||
       'contacto@nondecants.com';
-    this.frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ||
-      'http://localhost:4321';
+    // FRONTEND_URL también alimenta la lista de CORS y puede venir con varios
+    // orígenes separados por coma; para los enlaces del correo se usa el
+    // primero, sin barra final.
+    const configuredFrontend = (this.configService.get<string>('FRONTEND_URL') ?? '')
+      .split(',')[0]
+      .trim()
+      .replace(/\/+$/, '');
+    this.frontendUrl = configuredFrontend || 'http://localhost:4321';
+    if (
+      this.configService.get<string>('NODE_ENV') === 'production' &&
+      (!configuredFrontend || /localhost/i.test(configuredFrontend))
+    ) {
+      // Sin esto los correos salen con enlaces a localhost: el cliente no puede
+      // verificar su cuenta ni resetear su contraseña.
+      this.logger.error(
+        `FRONTEND_URL no apunta al sitio público (valor actual: "${this.frontendUrl}"). ` +
+          'Los enlaces de verificación y de reseteo de contraseña saldrán rotos.',
+      );
+    }
     // M-13: alerta interna de pedidos nuevos.
     this.adminEmail =
       this.configService.get<string>('ADMIN_EMAIL') || 'nondecants@gmail.com';
