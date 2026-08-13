@@ -100,6 +100,12 @@ export class ProductResponseDto {
   @ApiProperty()
   marcaId: number;
 
+  @ApiProperty({
+    required: false,
+    description: 'Casa del perfume: la ficha la muestra y enlaza a su catálogo',
+  })
+  marca?: { id: number; name: string; slug?: string };
+
   @ApiProperty({ description: 'Number of active purchasable formats (bottle + decants)' })
   variationsCount: number;
 
@@ -163,6 +169,13 @@ export class ProductResponseDto {
     this.salesCount = product.salesCount ?? 0;
     this.categoryId = product.categoryId;
     this.marcaId = product.marcaId;
+    this.marca = product.marca
+      ? {
+          id: Number(product.marca.id),
+          name: product.marca.name,
+          slug: product.marca.slug ?? undefined,
+        }
+      : undefined;
     // Conteo de formatos: usa el count del list (loadRelationCountAndMap) o,
     // en el detalle, la longitud de las variaciones cargadas.
     this.variationsCount =
