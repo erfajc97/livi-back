@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, ConflictException } from '@nestj
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
 import { Subscriber } from './entities/subscriber.entity';
 import { Campaign, CampaignStatus } from './entities/campaign.entity';
@@ -13,8 +14,9 @@ import { getNewsletterEmailHtml } from './templates/newsletter-email';
 export class NewsletterService {
   private readonly logger = new Logger(NewsletterService.name);
   private readonly fromEmail: string;
+  private readonly fromName: string;
   private readonly frontendUrl: string;
-  private sgMail: any = null;
+  private resend: Resend | null = null;
 
   constructor(
     @InjectRepository(Subscriber)
@@ -23,21 +25,22 @@ export class NewsletterService {
     private campaignRepo: Repository<Campaign>,
     private configService: ConfigService,
   ) {
-    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
-    if (apiKey && !apiKey.includes('your-sendgrid')) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const sg = require('@sendgrid/mail');
-        sg.setApiKey(apiKey);
-        this.sgMail = sg;
-      } catch {
-        this.logger.warn('SendGrid not available for newsletters');
-      }
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (apiKey && apiKey.startsWith('re_')) {
+      this.resend = new Resend(apiKey);
+    } else {
+      this.logger.warn('RESEND_API_KEY sin configurar: las campañas no se envían');
     }
     this.fromEmail =
-      this.configService.get<string>('SENDGRID_FROM_EMAIL') || 'noreply@nondecants.com';
+      this.configService.get<string>('MAIL_FROM_EMAIL') || 'noreply@nondecants.com';
+    this.fromName = this.configService.get<string>('MAIL_FROM_NAME') || 'NonDecants';
+    // FRONTEND_URL puede traer varios orígenes (lista de CORS): para los
+    // enlaces del correo vale el primero.
     this.frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4321';
+      (this.configService.get<string>('FRONTEND_URL') ?? '')
+        .split(',')[0]
+        .trim()
+        .replace(/\/+$/, '') || 'http://localhost:4321';
   }
 
   // ─── Subscribers ──────────────────────────────────────
@@ -130,7 +133,7 @@ export class NewsletterService {
       throw new ConflictException('No hay suscriptores activos');
     }
 
-    if (!this.sgMail) {
+    if (!this.resend) {
       this.logger.log(`[DEV] Would send campaign "${campaign.subject}" to ${subscribers.length} subscribers`);
       campaign.status = CampaignStatus.SENT;
       campaign.recipientCount = subscribers.length;
@@ -139,7 +142,7 @@ export class NewsletterService {
     }
 
     try {
-      // Send in batches of 100 (SendGrid personalization limit)
+      // Resend envía por lotes de hasta 100 correos en una sola llamada.
       const batchSize = 100;
       let sent = 0;
 
@@ -147,8 +150,8 @@ export class NewsletterService {
         const batch = subscribers.slice(i, i + batchSize);
 
         const messages = batch.map((sub) => ({
-          to: sub.email,
-          from: { email: this.fromEmail, name: 'NönDecants' },
+          from: `${this.fromName} <${this.fromEmail}>`,
+          to: [sub.email],
           subject: campaign.subject,
           html: getNewsletterEmailHtml({
             heading: campaign.heading,
@@ -160,7 +163,10 @@ export class NewsletterService {
           }),
         }));
 
-        await this.sgMail.send(messages);
+        const { error } = await this.resend.batch.send(messages);
+        if (error) {
+          throw new Error(`${error.name}: ${error.message}`);
+        }
         sent += batch.length;
         this.logger.log(`Newsletter batch sent: ${sent}/${subscribers.length}`);
       }

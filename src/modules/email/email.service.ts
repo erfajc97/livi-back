@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Resend } from 'resend';
 import { getVerificationEmailHtml } from './templates/verification-email';
 import { getPasswordResetEmailHtml } from './templates/password-reset-email';
 import { getGuestAccountEmailHtml } from './templates/guest-account-email';
@@ -26,30 +27,26 @@ export class EmailService {
   private readonly fromEmail: string;
   private readonly frontendUrl: string;
   private readonly adminEmail: string;
-  private sgMail: any = null;
+  private readonly fromName: string;
+  private resend: Resend | null = null;
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
-    if (apiKey && !apiKey.includes('your-sendgrid')) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const sg = require('@sendgrid/mail');
-        sg.setApiKey(apiKey);
-        this.sgMail = sg;
-        this.logger.log('SendGrid configured successfully');
-      } catch (error) {
-        this.logger.warn('SendGrid not available, emails will be logged only');
-      }
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (apiKey && apiKey.startsWith('re_')) {
+      this.resend = new Resend(apiKey);
+      this.logger.log('Resend configurado');
     } else {
       this.logger.warn(
-        'SENDGRID_API_KEY not configured, emails will be logged only',
+        'RESEND_API_KEY sin configurar: los correos solo se registran en el log',
       );
     }
-    // Matriz de mailing: todos los correos al cliente salen desde
-    // contacto@nondecants.com (requiere SPF/DKIM del dominio bien configurados).
+    // Remitente de toda la matriz de mailing. El dominio debe estar verificado
+    // en Resend (SPF + DKIM) o los envíos se rechazan.
     this.fromEmail =
-      this.configService.get<string>('SENDGRID_FROM_EMAIL') ||
-      'contacto@nondecants.com';
+      this.configService.get<string>('MAIL_FROM_EMAIL') ||
+      'noreply@nondecants.com';
+    this.fromName =
+      this.configService.get<string>('MAIL_FROM_NAME') || BRAND_NAME;
     // FRONTEND_URL también alimenta la lista de CORS y puede venir con varios
     // orígenes separados por coma; para los enlaces del correo se usa el
     // primero, sin barra final.
@@ -75,7 +72,7 @@ export class EmailService {
   }
 
   /**
-   * Envío genérico. Sin SendGrid configurado solo registra en log (DEV).
+   * Envío genérico por Resend. Sin API key solo registra en log (DEV).
    * Nunca lanza: un correo fallido no debe romper el flujo de negocio.
    */
   private async send(
@@ -86,18 +83,26 @@ export class EmailService {
   ): Promise<void> {
     if (!to) return;
 
-    if (!this.sgMail) {
+    if (!this.resend) {
       this.logger.log(`[DEV] ${logLabel} para ${to}: "${subject}"`);
       return;
     }
 
     try {
-      await this.sgMail.send({
-        to,
-        from: { email: this.fromEmail, name: BRAND_NAME },
+      // Resend responde 200 con `error` en el cuerpo cuando rechaza el envío
+      // (dominio sin verificar, destinatario inválido…): hay que mirarlo.
+      const { error } = await this.resend.emails.send({
+        from: `${this.fromName} <${this.fromEmail}>`,
+        to: [to],
         subject,
         html,
       });
+      if (error) {
+        this.logger.error(
+          `Resend rechazó ${logLabel} para ${to}: ${error.name} — ${error.message}`,
+        );
+        return;
+      }
       this.logger.log(`${logLabel} enviado a ${to}`);
     } catch (error) {
       this.logger.error(`Fallo al enviar ${logLabel} a ${to}`, error);

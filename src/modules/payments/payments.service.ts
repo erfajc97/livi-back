@@ -624,6 +624,7 @@ export class PaymentsService {
     orderId: number,
     file: Express.Multer.File,
     user: User | null,
+    customerEmail?: string,
   ) {
     const order = await this.ordersRepository.findOne({
       where: { id: orderId as any },
@@ -631,14 +632,24 @@ export class PaymentsService {
     });
 
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
-    // Órdenes guest (sin dueño) aceptan comprobante sin sesión. Las que tienen
-    // dueño exigen ser el propio usuario o un admin.
-    if (
-      order.userId != null &&
-      order.userId !== user?.id &&
-      user?.role !== 'admin'
-    ) {
-      throw new BadRequestException('No tienes permisos para esta orden');
+
+    // Quien compra sin sesión igual termina siendo dueño de su orden: al crearla
+    // se le abre una cuenta automática y la orden queda con ese `userId`. Pedir
+    // sesión para subir el comprobante dejaba al invitado fuera de su propia
+    // compra, así que también vale demostrar que es suyo con el correo del
+    // pedido —dato que solo tiene quien acaba de comprar—.
+    const isAdmin = user?.role === 'admin';
+    const isOwner =
+      user != null && order.userId != null && Number(order.userId) === Number(user.id);
+    const emailMatches =
+      !!customerEmail &&
+      !!order.customerEmail &&
+      customerEmail.trim().toLowerCase() === order.customerEmail.trim().toLowerCase();
+
+    if (!isAdmin && !isOwner && !emailMatches) {
+      throw new BadRequestException(
+        'No pudimos verificar que este pedido sea tuyo. Inicia sesión o vuelve a intentarlo desde el checkout.',
+      );
     }
 
     // Delete old receipt if exists

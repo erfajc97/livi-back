@@ -109,8 +109,10 @@ export class PaymentsController {
     @Param('orderId') orderId: string,
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User | null,
+    /** Correo del pedido: así el invitado puede subir el comprobante sin sesión. */
+    @Body('email') email?: string,
   ) {
     if (!file) throw new BadRequestException('No file provided');
-    return this.paymentsService.uploadTransferReceipt(+orderId, file, user);
+    return this.paymentsService.uploadTransferReceipt(+orderId, file, user, email);
   }
 }
