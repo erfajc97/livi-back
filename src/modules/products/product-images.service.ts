@@ -49,13 +49,23 @@ export class ProductImagesService {
       this.ALLOWED_IMAGE_TYPES,
     );
 
-    // Save image records to database
+    // El orden continúa desde la última imagen del producto. Antes cada subida
+    // empezaba de cero, así que al agregar una foto suelta quedaba empatada con
+    // la principal y el orden lo terminaba decidiendo la base: por eso a veces
+    // la segunda imagen aparecía primera.
+    const lastOrder = await this.productImagesRepository
+      .createQueryBuilder('img')
+      .select('MAX(img."displayOrder")', 'max')
+      .where('img."productId" = :productId', { productId })
+      .getRawOne<{ max: number | null }>();
+    const startOrder = Number(lastOrder?.max ?? -1) + 1;
+
     const images = uploadResults.map((result, index) => {
       return this.productImagesRepository.create({
         productId,
         url: result.url,
         key: result.key,
-        displayOrder: index,
+        displayOrder: startOrder + index,
       });
     });
 

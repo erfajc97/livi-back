@@ -60,16 +60,19 @@ export class ProductVariationsService {
       }
     }
 
-    // presentationType e isFullBottle se mantienen coherentes: si solo viene
-    // uno, el otro se deriva ('sellada'/'original' son botella completa).
+    // El tipo de presentación manda: es lo que el admin eligió en el formulario.
+    // Antes ganaba `isFullBottle` y el panel siempre lo mandaba en false, así que
+    // una variante "sellada" se guardaba como decant y en la ficha salía
+    // bloqueada por falta de ml.
     const presentationType =
       createVariationDto.presentationType ??
       (createVariationDto.isFullBottle
         ? PresentationType.SELLADA
         : PresentationType.DECANT);
     const isFullBottle =
-      createVariationDto.isFullBottle ??
-      presentationType !== PresentationType.DECANT;
+      createVariationDto.presentationType != null
+        ? presentationType !== PresentationType.DECANT
+        : (createVariationDto.isFullBottle ?? false);
 
     const variation = this.variationsRepository.create({
       productId: createVariationDto.productId,
@@ -166,13 +169,11 @@ export class ProductVariationsService {
       variation.isFullBottle = updateVariationDto.isFullBottle;
     }
     if (updateVariationDto.presentationType !== undefined) {
+      // El tipo elegido en el panel manda sobre `isFullBottle`: el formulario lo
+      // manda siempre en false y así una "sellada" terminaba guardada como decant.
       variation.presentationType = updateVariationDto.presentationType;
-      // 'sellada'/'original' son botella completa: alinear isFullBottle salvo
-      // que venga explícito en el mismo payload.
-      if (updateVariationDto.isFullBottle === undefined) {
-        variation.isFullBottle =
-          updateVariationDto.presentationType !== PresentationType.DECANT;
-      }
+      variation.isFullBottle =
+        updateVariationDto.presentationType !== PresentationType.DECANT;
     }
     if (updateVariationDto.sku !== undefined) {
       variation.sku = updateVariationDto.sku;

@@ -49,13 +49,22 @@ export class ProductVariationImagesService {
       this.ALLOWED_IMAGE_TYPES,
     );
 
-    // Save image records to database
+    // El orden continúa desde la última imagen de la variante: si cada subida
+    // vuelve a empezar en cero, las nuevas empatan con las viejas y el orden lo
+    // decide la base.
+    const lastOrder = await this.variationImagesRepository
+      .createQueryBuilder('img')
+      .select('MAX(img."displayOrder")', 'max')
+      .where('img."variationId" = :variationId', { variationId })
+      .getRawOne<{ max: number | null }>();
+    const startOrder = Number(lastOrder?.max ?? -1) + 1;
+
     const images = uploadResults.map((result, index) => {
       return this.variationImagesRepository.create({
         variationId,
         url: result.url,
         key: result.key,
-        displayOrder: index,
+        displayOrder: startOrder + index,
       });
     });
 
