@@ -19,6 +19,9 @@ import { OrderStatusHistory } from './entities/order-status-history.entity';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { CartService } from '../cart/cart.service';
 import { StockService } from '../products/stock.service';
+import { EmailService } from '../email/email.service';
+import { OrderEmailData, OrderEmailItem } from '../email/email.types';
+import { ShipmentKind } from '../email/templates/order-shipped-email';
 
 @Injectable()
 export class OrdersService {
@@ -38,7 +41,111 @@ export class OrdersService {
     private dataSource: DataSource,
     private cartService: CartService,
     private stockService: StockService,
+    private emailService: EmailService,
   ) {}
+
+  /**
+   * Datos del pedido para la matriz de mailing. `update()` ya carga productos y
+   * variaciones, así que los nombres reales salen de ahí sin consultas extra.
+   */
+  private buildOrderEmailData(order: Order): OrderEmailData {
+    const items: OrderEmailItem[] = (order.items ?? []).map((item) => {
+      const variation = item.productVariation;
+      const name = item.product?.name ?? variation?.product?.name ?? 'Producto';
+      const ml = variation && !variation.isFullBottle ? Number(variation.mlSize) : undefined;
+      return {
+        name,
+        quantity: item.quantity,
+        price: Number(item.price),
+        ml,
+        bajoPedidoQuantity: item.bajoPedidoQuantity
+          ? Number(item.bajoPedidoQuantity)
+          : undefined,
+      };
+    });
+
+    return {
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      paymentMethod: order.paymentMethod,
+      deliveryMethod: order.deliveryMethod,
+      shippingAddress: order.shippingAddress,
+      shippingCity: order.shippingCity,
+      subtotal: Number(order.subtotal ?? order.total),
+      deliveryCost: Number(order.deliveryCost ?? 0),
+      payphoneSurcharge: Number(order.payphoneSurcharge ?? 0),
+      couponDiscount: Number(order.couponDiscount ?? 0),
+      total: Number(order.total),
+      items,
+    };
+  }
+
+  /**
+   * Correos que dispara un cambio de estado (M-03 a M-08).
+   *
+   * Va en segundo plano y nunca lanza: el pedido ya cambió de estado y un fallo
+   * de correo no puede deshacerlo ni romper la respuesta del panel.
+   */
+  private notifyStatusChange(
+    order: Order,
+    previousStatus: OrderStatus,
+    hadTrackingBefore: boolean,
+  ): void {
+    if (order.status === previousStatus) return;
+
+    const data = this.buildOrderEmailData(order);
+    const isTransfer = order.paymentMethod === 'TRANSFERENCIA';
+    const fail = (label: string) => (err: any) =>
+      console.error(`[Orders] correo ${label} falló:`, err?.message);
+
+    switch (order.status) {
+      // M-03 · el admin validó el comprobante.
+      case OrderStatus.ACCEPTED:
+        if (isTransfer) {
+          this.emailService.sendTransferApprovedEmail(data).catch(fail('M-03'));
+        }
+        break;
+
+      // M-04 · el comprobante no sirvió.
+      case OrderStatus.REJECTED:
+        if (isTransfer) {
+          this.emailService.sendTransferRejectedEmail(data).catch(fail('M-04'));
+        }
+        break;
+
+      // M-05 / M-06 / M-07 · guía generada. Un pedido con líneas bajo pedido se
+      // despacha en dos veces: el primer envío avisa que falta la otra parte y
+      // el segundo (guía nueva sobre un pedido ya despachado) la cierra.
+      case OrderStatus.SHIPPED: {
+        const trackingCode = order.trackingCode;
+        if (!trackingCode) break;
+        const hasBackorder = (order.items ?? []).some(
+          (i) => Number(i.bajoPedidoQuantity ?? 0) > 0,
+        );
+        const kind: ShipmentKind = !hasBackorder
+          ? 'full'
+          : hadTrackingBefore
+            ? 'backorder'
+            : 'partial';
+        this.emailService
+          .sendOrderShippedEmail(data, trackingCode, kind)
+          .catch(fail('M-05/06/07'));
+        break;
+      }
+
+      // M-08 · Servientrega marcó la entrega: carta de agradecimiento.
+      case OrderStatus.DELIVERED:
+        this.emailService
+          .sendOrderDeliveredEmail(order.customerEmail, order.customerName)
+          .catch(fail('M-08'));
+        break;
+
+      default:
+        break;
+    }
+  }
 
   private resolveItemCost(product: Product | null, variation: ProductVariation | null): number {
     const variationCost = variation?.cost != null ? Number(variation.cost) : null;
@@ -607,6 +714,11 @@ export class OrdersService {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
+    // Estado y guía previos: con ellos se decide qué correo toca al final
+    // (y si un pedido mixto va por su primera o su segunda guía).
+    const statusBeforeUpdate = order.status;
+    const hadTrackingBefore = Boolean(order.trackingCode);
+
     // Clients can only update their own orders, and only cancel them
     if (userRole === 'client') {
       if (order.userId !== userId) {
@@ -684,6 +796,8 @@ export class OrdersService {
           updateOrderDto.statusNote,
         );
 
+        this.notifyStatusChange(order, statusBeforeUpdate, hadTrackingBefore);
+
         return new OrderResponseDto(order);
       } catch (error) {
         await queryRunner.rollbackTransaction();
@@ -737,6 +851,9 @@ export class OrdersService {
     this.applyNonStatusUpdates(order, updateOrderDto);
 
     const updatedOrder = await this.ordersRepository.save(order);
+
+    this.notifyStatusChange(updatedOrder, statusBeforeUpdate, hadTrackingBefore);
+
     return new OrderResponseDto(updatedOrder);
   }
 

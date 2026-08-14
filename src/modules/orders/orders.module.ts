@@ -10,12 +10,14 @@ import { ProductVariation } from '../products/entities/product-variation.entity'
 import { Transaction } from '../finance/entities/transaction.entity';
 import { CartModule } from '../cart/cart.module';
 import { ProductsModule } from '../products/products.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, OrderItem, OrderStatusHistory, Product, ProductVariation, Transaction]),
     CartModule,
     ProductsModule,
+    EmailModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],
