@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Order } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
 import { Product } from '../products/entities/product.entity';
@@ -21,6 +21,7 @@ import { OrderNotificationService } from '../../common/services/order-notificati
 import { CouponsService } from '../coupons/coupons.service';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
+import { OrderEmailData, OrderEmailItem } from '../email/email.types';
 
 const PAYPHONE_SURCHARGE_RATE = 0.06; // 6%
 
@@ -44,6 +45,72 @@ export class PaymentsService {
     private usersService: UsersService,
     private emailService: EmailService,
   ) {}
+
+  /**
+   * Arma los datos del correo a partir de una orden ya guardada.
+   *
+   * Las líneas solo guardan ids, así que los nombres reales —y los ml del
+   * decant— se resuelven acá; sin esto el cliente recibiría un detalle con
+   * "Producto 12" en lugar del perfume que compró.
+   */
+  private async buildOrderEmailData(order: Order): Promise<OrderEmailData> {
+    const items = order.items ?? [];
+    const variationIds = items
+      .map((i) => i.productVariationId)
+      .filter((id): id is number => id != null);
+    const productIds = items
+      .map((i) => i.productId)
+      .filter((id): id is number => id != null);
+
+    const variations = variationIds.length
+      ? await this.variationsRepository.find({
+          where: { id: In(variationIds) },
+          relations: ['product'],
+        })
+      : [];
+    const products = productIds.length
+      ? await this.productsRepository.find({ where: { id: In(productIds) } })
+      : [];
+
+    const variationById = new Map(variations.map((v) => [String(v.id), v]));
+    const productById = new Map(products.map((p) => [String(p.id), p]));
+
+    const emailItems: OrderEmailItem[] = items.map((item) => {
+      const variation = item.productVariationId
+        ? variationById.get(String(item.productVariationId))
+        : undefined;
+      const product =
+        variation?.product ??
+        (item.productId ? productById.get(String(item.productId)) : undefined);
+      const ml = variation ? Number(variation.mlSize) : undefined;
+      return {
+        name: product?.name ?? 'Producto',
+        quantity: item.quantity,
+        price: Number(item.price),
+        ml: ml && !variation?.isFullBottle ? ml : undefined,
+        bajoPedidoQuantity: item.bajoPedidoQuantity
+          ? Number(item.bajoPedidoQuantity)
+          : undefined,
+      };
+    });
+
+    return {
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      paymentMethod: order.paymentMethod,
+      deliveryMethod: order.deliveryMethod,
+      shippingAddress: order.shippingAddress,
+      shippingCity: order.shippingCity,
+      subtotal: Number(order.subtotal ?? order.total),
+      deliveryCost: Number(order.deliveryCost ?? 0),
+      payphoneSurcharge: Number(order.payphoneSurcharge ?? 0),
+      couponDiscount: Number(order.couponDiscount ?? 0),
+      total: Number(order.total),
+      items: emailItems,
+    };
+  }
 
   private generateOrderNumber(): string {
     const year = new Date().getFullYear();
@@ -548,6 +615,15 @@ export class PaymentsService {
       } finally {
         await queryRunner.release();
       }
+
+      // M-01 · Confirmación al cliente. En segundo plano: el pago ya está hecho
+      // y un fallo de correo no puede tumbar la respuesta. El corte por
+      // idempotencia de arriba evita que se mande dos veces.
+      this.buildOrderEmailData(order)
+        .then((data) => this.emailService.sendOrderConfirmationEmail(data))
+        .catch((err) =>
+          console.error('[Payments] M-01 confirmación falló:', err?.message),
+        );
     } else {
       order.paymentStatus = 'failed';
       order.paymentReference = `${confirmation.transactionStatus} (${confirmation.statusCode})`;
@@ -668,6 +744,15 @@ export class PaymentsService {
     order.paymentStatus = 'receipt_uploaded';
 
     await this.ordersRepository.save(order);
+
+    // M-02 · Acuse al cliente: su orden quedó registrada y se procesa cuando el
+    // pago se valide. Va en segundo plano, igual que el resto de la matriz.
+    this.buildOrderEmailData(order)
+      .then((data) => this.emailService.sendTransferReceivedEmail(data))
+      .catch((err) =>
+        console.error('[Payments] M-02 acuse de transferencia falló:', err?.message),
+      );
+
     return new OrderResponseDto(order);
   }
 }

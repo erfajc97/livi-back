@@ -146,14 +146,24 @@ export class AuthService {
   async forgotPassword(email: string): Promise<{ message: string }> {
     const result = await this.usersService.setPasswordResetToken(email);
 
-    if (result) {
+    if (result.outcome === 'token') {
       await this.emailService.sendPasswordResetEmail(
         result.user.email,
         result.user.firstName,
         result.token,
       );
+    } else if (result.outcome === 'google') {
+      // La cuenta entra con Google: no hay contraseña que cambiar, pero el
+      // silencio se lee como "el correo no llegó". Se avisa por correo, que
+      // solo ve el dueño de la cuenta.
+      await this.emailService.sendPasswordResetGoogleNotice(
+        result.user.email,
+        result.user.firstName,
+      );
     }
 
+    // La respuesta no distingue los tres casos: decir "ese email no existe"
+    // permitiría averiguar quién tiene cuenta.
     return {
       message:
         'Si el email está registrado, recibirás un enlace para restablecer tu contraseña.',

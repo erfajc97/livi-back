@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { getVerificationEmailHtml } from './templates/verification-email';
-import { getPasswordResetEmailHtml } from './templates/password-reset-email';
+import {
+  getPasswordResetEmailHtml,
+  getPasswordResetGoogleNoticeHtml,
+} from './templates/password-reset-email';
 import { getGuestAccountEmailHtml } from './templates/guest-account-email';
 import { getOrderConfirmationEmailHtml } from './templates/order-confirmation-email';
 import {
@@ -134,6 +137,22 @@ export class EmailService {
       'Restablecer contraseña — NonDecants',
       getPasswordResetEmailHtml(firstName, resetUrl),
       'Correo de restablecimiento de contraseña',
+    );
+  }
+
+  /**
+   * Cuenta creada con Google: no hay contraseña que restablecer. Se avisa igual
+   * para que el cliente no se quede esperando un enlace que nunca sale.
+   */
+  async sendPasswordResetGoogleNotice(
+    email: string,
+    firstName: string,
+  ): Promise<void> {
+    await this.send(
+      email,
+      'Tu cuenta entra con Google — NonDecants',
+      getPasswordResetGoogleNoticeHtml(firstName, `${this.frontendUrl}/`),
+      'Aviso de cuenta Google',
     );
   }
 

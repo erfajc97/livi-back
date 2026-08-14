@@ -168,14 +168,24 @@ export class UsersService {
     });
   }
 
+  /**
+   * Prepara el restablecimiento de contraseña.
+   *
+   * Devuelve el motivo cuando no hay token: una cuenta de Google no tiene
+   * contraseña nuestra, y quien la pidió merece saberlo por correo en vez de
+   * quedarse esperando un enlace que nunca sale.
+   */
   async setPasswordResetToken(
     email: string,
-  ): Promise<{ token: string; user: User } | null> {
+  ): Promise<
+    | { outcome: 'token'; token: string; user: User }
+    | { outcome: 'google'; user: User }
+    | { outcome: 'not_found' }
+  > {
     const user = await this.usersRepository.findOne({ where: { email } });
 
-    if (!user || user.authProvider === 'google') {
-      return null;
-    }
+    if (!user) return { outcome: 'not_found' };
+    if (user.authProvider === 'google') return { outcome: 'google', user };
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto
@@ -190,7 +200,7 @@ export class UsersService {
       passwordResetTokenExpiry: expiry,
     });
 
-    return { token: rawToken, user };
+    return { outcome: 'token', token: rawToken, user };
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
