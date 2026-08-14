@@ -259,6 +259,46 @@ export class UsersService {
     await this.usersRepository.update(userId, { password: hashedPassword });
   }
 
+  /**
+   * Restablecimiento hecho por un admin desde el panel: no pide la contraseña
+   * actual (el admin no la tiene) y, si no le pasan una, genera una temporal
+   * legible para poder dictarla o enviarla por correo.
+   *
+   * Devuelve la contraseña en plano porque el panel necesita mostrarla una
+   * vez; después ya no hay forma de recuperarla.
+   */
+  async adminResetPassword(
+    id: number,
+    newPassword?: string,
+  ): Promise<{ user: User; plainPassword: string }> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // Una cuenta de Google entra por Google: ponerle contraseña no le
+    // devuelve el acceso y solo confunde a quien la usa.
+    if (user.authProvider === 'google') {
+      throw new BadRequestException(
+        'Esta cuenta entra con Google — no tiene contraseña que restablecer',
+      );
+    }
+
+    const plainPassword =
+      newPassword || `Nd-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+    await this.usersRepository.update(id, {
+      password: await bcrypt.hash(plainPassword, 10),
+      // Un enlace de "olvidé mi contraseña" pendiente dejaría de tener
+      // sentido tras el cambio: se invalida.
+      passwordResetToken: null,
+      passwordResetTokenExpiry: null,
+    });
+
+    return { user, plainPassword };
+  }
+
   async findAll(): Promise<UserResponseDto[]> {
     const users = await this.usersRepository.find({ order: { createdAt: 'DESC' } });
     return users.map((user) => new UserResponseDto(user));

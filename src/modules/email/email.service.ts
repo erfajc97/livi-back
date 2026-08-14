@@ -7,6 +7,7 @@ import {
   getPasswordResetGoogleNoticeHtml,
 } from './templates/password-reset-email';
 import { getGuestAccountEmailHtml } from './templates/guest-account-email';
+import { getAdminPasswordResetEmailHtml } from './templates/admin-password-reset-email';
 import { getOrderConfirmationEmailHtml } from './templates/order-confirmation-email';
 import {
   getTransferApprovedEmailHtml,
@@ -171,6 +172,24 @@ export class EmailService {
       'Tu cuenta de NonDecants está lista — NonDecants',
       getGuestAccountEmailHtml(firstName, email, password, loginUrl),
       'Correo de cuenta guest',
+    );
+  }
+
+  /**
+   * Contraseña asignada por un admin desde el panel. Igual que la de guest,
+   * viaja en claro: es la única forma de que el cliente la reciba.
+   */
+  async sendAdminPasswordResetEmail(
+    email: string,
+    firstName: string,
+    password: string,
+  ): Promise<void> {
+    const loginUrl = `${this.frontendUrl}/mi-cuenta`;
+    await this.send(
+      email,
+      'Tu contraseña fue actualizada — NonDecants',
+      getAdminPasswordResetEmailHtml(firstName, email, password, loginUrl),
+      'Correo de contraseña asignada por admin',
     );
   }
 

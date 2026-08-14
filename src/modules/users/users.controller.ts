@@ -12,7 +12,9 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@ne
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AdminResetPasswordDto } from './dto/admin-reset-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { EmailService } from '../email/email.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -24,7 +26,10 @@ import { User } from './entities/user.entity';
 @ApiTags('users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly emailService: EmailService,
+  ) {}
 
   @Post()
   @Public()
@@ -64,8 +69,15 @@ export class UsersController {
   updateMe(@CurrentUser() user: User, @Body() updateUserDto: UpdateUserDto) {
     // Seguridad: el usuario autenticado NO puede auto-asignarse rol ni
     // activarse/desactivarse a sí mismo. Esos campos solo los cambia un
-    // admin vía PATCH /users/:id.
-    const { role: _role, isActive: _isActive, ...safe } = updateUserDto;
+    // admin vía PATCH /users/:id. La contraseña tampoco pasa por aquí:
+    // saltarse este filtro permitiría cambiarla sin conocer la actual
+    // (eso lo cubre POST /auth/change-password).
+    const {
+      role: _role,
+      isActive: _isActive,
+      password: _password,
+      ...safe
+    } = updateUserDto;
     return this.usersService.update(user.id, safe);
   }
 
@@ -91,6 +103,46 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(+id, updateUserDto);
+  }
+
+  @Patch(':id/password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Reset user password',
+    description:
+      'Asigna una contraseña nueva a un usuario. Si no se envía, se genera una temporal.',
+  })
+  @ApiParam({ name: 'id', type: 'number', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'Contraseña restablecida' })
+  @ApiResponse({ status: 400, description: 'La cuenta entra con Google' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async resetPassword(
+    @Param('id') id: string,
+    @Body() dto: AdminResetPasswordDto,
+  ) {
+    const { user, plainPassword } = await this.usersService.adminResetPassword(
+      +id,
+      dto.password,
+    );
+
+    // El correo es informativo: si Resend falla no se revierte el cambio,
+    // el admin ya tiene la contraseña en pantalla para dictarla.
+    if (dto.notify !== false) {
+      await this.emailService.sendAdminPasswordResetEmail(
+        user.email,
+        user.firstName,
+        plainPassword,
+      );
+    }
+
+    return {
+      email: user.email,
+      // Solo aquí se puede leer: después queda hasheada.
+      password: plainPassword,
+      notified: dto.notify !== false,
+    };
   }
 
   @Delete(':id')

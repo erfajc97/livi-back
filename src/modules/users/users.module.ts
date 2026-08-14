@@ -6,9 +6,10 @@ import { AddressesService } from './addresses.service';
 import { AddressesController } from './addresses.controller';
 import { User } from './entities/user.entity';
 import { UserAddress } from './entities/user-address.entity';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, UserAddress])],
+  imports: [TypeOrmModule.forFeature([User, UserAddress]), EmailModule],
   controllers: [UsersController, AddressesController],
   providers: [UsersService, AddressesService],
   exports: [UsersService],
