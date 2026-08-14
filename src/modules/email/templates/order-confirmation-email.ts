@@ -39,8 +39,8 @@ export function getOrderConfirmationEmailHtml(data: OrderEmailData): string {
 
   const body = `
     ${paragraph(
-      `Hola <strong style="color:#FFFFFF;">${firstName}</strong>, tu pago fue aprobado y tu pedido
-      <strong style="color:#FFFFFF;">${escapeHtml(data.orderNumber)}</strong> está confirmado.
+      `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, tu pago fue aprobado y tu pedido
+      <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> está confirmado.
       Estos son los detalles de tu compra:`,
     )}
     ${itemsTable(data.items)}

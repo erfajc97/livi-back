@@ -18,7 +18,7 @@ export function getAbandonedCartEmailHtml(
 ): string {
   const body = `
     ${paragraph(
-      `Hola <strong style="color:#FFFFFF;">${escapeHtml(firstName || 'Cliente')}</strong>,
+      `Hola <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(firstName || 'Cliente')}</strong>,
       dejaste estos perfumes en tu carrito. Todavía están disponibles — completa tu compra
       antes de que se agoten:`,
     )}

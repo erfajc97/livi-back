@@ -2,7 +2,15 @@ import { OrderEmailItem } from '../email.types';
 
 /**
  * Layout base de marca para todos los correos transaccionales de NonDecants.
- * Negro carbón #1B1919 + dorado #CCB377, títulos en serif.
+ *
+ * Sigue la identidad Atelier de la tienda: fondo marfil, tinta carbón, dorado
+ * como acento y titulares en serif. Antes los correos eran oscuros —de la etapa
+ * anterior de la marca— y al lado del sitio parecían de otra empresa.
+ *
+ * Reglas de correo HTML que condicionan el código de acá:
+ * tablas en vez de flex/grid, estilos en línea (Gmail descarta el <style>),
+ * ancho fijo de 600 px y colores en hex de seis dígitos.
+ *
  * Todo correo al cliente lleva pie con WhatsApp 0992305463 y
  * contacto@nondecants.com (regla de la matriz de mailing).
  */
@@ -11,6 +19,18 @@ export const BRAND_NAME = 'NonDecants';
 export const BRAND_WHATSAPP = '0992305463';
 export const BRAND_WHATSAPP_URL = 'https://wa.me/593992305463';
 export const BRAND_CONTACT_EMAIL = 'contacto@nondecants.com';
+
+/** Paleta Atelier, la misma del sitio. */
+const C = {
+  page: '#EFEAE3', // marfil del fondo
+  card: '#FFFDFA', // tarjeta, un punto más clara que el fondo
+  ink: '#1C1A17', // texto principal
+  soft: '#56504A', // párrafos
+  muted: '#8A8278', // rótulos y notas al pie
+  line: '#E5DED4', // hairlines
+  gold: '#CCB377', // acento
+  goldSoft: '#F3EBDB', // fondo de bloques destacados
+};
 
 export function escapeHtml(value: string): string {
   return String(value ?? '')
@@ -25,55 +45,81 @@ export function formatUsd(amount: number): string {
   return `$${Number(amount || 0).toFixed(2)}`;
 }
 
+// Cormorant no existe en los clientes de correo: Georgia es la serif que más
+// se le parece y está en todos lados.
 const SERIF = `Georgia,'Times New Roman',serif`;
-const SANS = `'Helvetica Neue',Arial,sans-serif`;
+const SANS = `'Helvetica Neue',Helvetica,Arial,sans-serif`;
+
+/** Rótulo pequeño en versalitas, el mismo recurso que el sitio. */
+export function eyebrow(text: string): string {
+  return `<p style="margin:0 0 10px;font-family:${SANS};font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:${C.muted};">${text}</p>`;
+}
 
 /**
- * Envuelve el contenido de un correo en el layout de marca.
- * `title` es el encabezado serif grande dentro de la tarjeta.
+ * Envuelve el contenido en el layout de marca.
+ * `title` es el titular serif de la tarjeta; `eyebrowText` el rótulo de arriba.
  */
-export function baseEmailLayout(title: string, bodyHtml: string): string {
-  return `
-<!DOCTYPE html>
+export function baseEmailLayout(
+  title: string,
+  bodyHtml: string,
+  eyebrowText?: string,
+): string {
+  return `<!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:${SANS};">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:40px 0;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:${C.page};font-family:${SANS};-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${C.page};">
     <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#1B1919;border-radius:8px;overflow:hidden;">
-          <!-- Header -->
+      <td align="center" style="padding:32px 16px 40px;">
+
+        <!-- Marca -->
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;">
           <tr>
-            <td style="padding:32px 40px 24px;text-align:center;border-bottom:1px solid #3A3636;">
-              <h1 style="margin:0;font-size:30px;font-weight:700;color:#CCB377;letter-spacing:2px;font-family:${SERIF};">
+            <td align="center" style="padding:8px 0 22px;">
+              <span style="font-family:${SERIF};font-size:22px;letter-spacing:5px;text-transform:uppercase;color:${C.ink};">
                 NonDecants
-              </h1>
+              </span>
             </td>
           </tr>
-          <!-- Body -->
+        </table>
+
+        <!-- Tarjeta -->
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background-color:${C.card};border:1px solid ${C.line};">
+          <!-- Filete dorado superior -->
+          <tr><td style="height:3px;line-height:3px;font-size:0;background-color:${C.gold};">&nbsp;</td></tr>
           <tr>
-            <td style="padding:40px;">
-              <h2 style="margin:0 0 20px;font-size:24px;color:#FFFFFF;font-weight:600;font-family:${SERIF};">
+            <td style="padding:40px 44px 44px;">
+              ${eyebrowText ? eyebrow(eyebrowText) : ''}
+              <h1 style="margin:0 0 22px;font-family:${SERIF};font-size:30px;line-height:1.15;font-weight:400;color:${C.ink};">
                 ${title}
-              </h2>
+              </h1>
               ${bodyHtml}
             </td>
           </tr>
-          <!-- Footer: va en TODOS los correos al cliente -->
+        </table>
+
+        <!-- Pie: va en TODOS los correos al cliente -->
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;">
           <tr>
-            <td style="padding:24px 40px;border-top:1px solid #3A3636;text-align:center;">
-              <p style="margin:0 0 6px;font-size:13px;color:#A09A9A;">
+            <td align="center" style="padding:26px 24px 0;">
+              <p style="margin:0 0 8px;font-family:${SANS};font-size:13px;line-height:1.6;color:${C.soft};">
                 ¿Dudas? Escríbenos por
-                <a href="${BRAND_WHATSAPP_URL}" style="color:#CCB377;text-decoration:none;">WhatsApp ${BRAND_WHATSAPP}</a>
+                <a href="${BRAND_WHATSAPP_URL}" style="color:${C.ink};text-decoration:underline;">WhatsApp ${BRAND_WHATSAPP}</a>
                 o a
-                <a href="mailto:${BRAND_CONTACT_EMAIL}" style="color:#CCB377;text-decoration:none;">${BRAND_CONTACT_EMAIL}</a>
+                <a href="mailto:${BRAND_CONTACT_EMAIL}" style="color:${C.ink};text-decoration:underline;">${BRAND_CONTACT_EMAIL}</a>
               </p>
-              <p style="margin:0;font-size:12px;color:#6E6868;">
-                NonDecants — Perfumes auténticos, Ecuador
+              <p style="margin:0;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};">
+                ${BRAND_NAME} — Perfumes auténticos, Ecuador
               </p>
             </td>
           </tr>
         </table>
+
       </td>
     </tr>
   </table>
@@ -81,14 +127,17 @@ export function baseEmailLayout(title: string, bodyHtml: string): string {
 </html>`;
 }
 
-/** Botón dorado principal. */
+/**
+ * Botón principal. Tinta con texto marfil, como en la tienda; el `border` en el
+ * mismo tono evita el borde azul que Outlook agrega por su cuenta.
+ */
 export function ctaButton(label: string, url: string): string {
   return `
-  <table width="100%" cellpadding="0" cellspacing="0">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 28px;">
     <tr>
-      <td align="center" style="padding:8px 0 28px;">
+      <td align="center">
         <a href="${url}"
-           style="display:inline-block;padding:14px 40px;background-color:#CCB377;color:#1B1919;font-size:14px;font-weight:700;text-decoration:none;border-radius:6px;letter-spacing:1px;text-transform:uppercase;font-family:${SANS};">
+           style="display:inline-block;padding:15px 40px;background-color:${C.ink};border:1px solid ${C.ink};color:${C.card};font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;text-decoration:none;">
           ${label}
         </a>
       </td>
@@ -96,20 +145,28 @@ export function ctaButton(label: string, url: string): string {
   </table>`;
 }
 
-/** Tabla de productos del pedido (versión oscura de marca). */
+/** Enlace secundario, para cuando el botón no se puede tocar. */
+export function fallbackLink(url: string): string {
+  return `<p style="margin:0 0 24px;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};word-break:break-all;">
+    Si el botón no funciona, copia este enlace: <span style="color:${C.soft};">${url}</span>
+  </p>`;
+}
+
+/** Detalle del pedido: una línea por producto, con hairlines. */
 export function itemsTable(items: OrderEmailItem[]): string {
   const rows = items
     .map((i) => {
-      const detail = i.ml ? ` (${i.ml} ml)` : '';
+      const detail = i.ml ? `${i.ml} ml` : 'Botella completa';
       const backorder =
         i.bajoPedidoQuantity && i.bajoPedidoQuantity > 0
-          ? ` <span style="color:#CCB377;font-size:12px;">· ${i.bajoPedidoQuantity} bajo pedido</span>`
+          ? `<span style="color:${C.gold};"> · ${i.bajoPedidoQuantity} bajo pedido</span>`
           : '';
       return `<tr>
-        <td style="padding:10px 8px;border-bottom:1px solid #3A3636;font-size:14px;color:#FFFFFF;">
-          ${i.quantity}x ${escapeHtml(i.name)}${detail}${backorder}
+        <td style="padding:14px 0;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;line-height:1.5;color:${C.ink};">
+          <span style="font-family:${SERIF};font-size:16px;">${escapeHtml(i.name)}</span><br>
+          <span style="font-size:12px;color:${C.muted};">${i.quantity} × ${detail}${backorder}</span>
         </td>
-        <td style="padding:10px 8px;border-bottom:1px solid #3A3636;font-size:14px;color:#FFFFFF;text-align:right;white-space:nowrap;">
+        <td style="padding:14px 0;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;color:${C.ink};text-align:right;white-space:nowrap;vertical-align:top;">
           ${formatUsd(i.price * i.quantity)}
         </td>
       </tr>`;
@@ -117,18 +174,13 @@ export function itemsTable(items: OrderEmailItem[]): string {
     .join('');
 
   return `
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border-collapse:collapse;">
-    <thead>
-      <tr>
-        <th style="text-align:left;padding:8px;border-bottom:2px solid #CCB377;font-size:12px;color:#CCB377;letter-spacing:1px;text-transform:uppercase;">Producto</th>
-        <th style="text-align:right;padding:8px;border-bottom:2px solid #CCB377;font-size:12px;color:#CCB377;letter-spacing:1px;text-transform:uppercase;">Precio</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
+  ${eyebrow('Tu pedido')}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;border-collapse:collapse;border-top:1px solid ${C.line};">
+    ${rows}
   </table>`;
 }
 
-/** Bloque de totales (subtotal, envío, recargos, descuento, total). */
+/** Totales: etiquetas discretas y el total en serif, que es lo que se busca. */
 export function totalsTable(data: {
   subtotal: number;
   deliveryCost?: number;
@@ -138,8 +190,8 @@ export function totalsTable(data: {
 }): string {
   const line = (label: string, value: string) => `
     <tr>
-      <td style="padding:4px 8px;font-size:13px;color:#A09A9A;">${label}</td>
-      <td style="padding:4px 8px;font-size:13px;color:#FFFFFF;text-align:right;">${value}</td>
+      <td style="padding:5px 0;font-family:${SANS};font-size:13px;color:${C.muted};">${label}</td>
+      <td style="padding:5px 0;font-family:${SANS};font-size:13px;color:${C.soft};text-align:right;">${value}</td>
     </tr>`;
 
   let rows = line('Subtotal', formatUsd(data.subtotal));
@@ -157,17 +209,17 @@ export function totalsTable(data: {
   }
   rows += `
     <tr>
-      <td style="padding:10px 8px 0;font-size:15px;font-weight:700;color:#CCB377;border-top:1px solid #3A3636;">Total</td>
-      <td style="padding:10px 8px 0;font-size:15px;font-weight:700;color:#CCB377;text-align:right;border-top:1px solid #3A3636;">${formatUsd(data.total)}</td>
+      <td style="padding:14px 0 0;border-top:1px solid ${C.line};font-family:${SANS};font-size:11px;letter-spacing:2px;text-transform:uppercase;color:${C.muted};">Total</td>
+      <td style="padding:14px 0 0;border-top:1px solid ${C.line};font-family:${SERIF};font-size:22px;color:${C.ink};text-align:right;">${formatUsd(data.total)}</td>
     </tr>`;
 
   return `
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;border-collapse:collapse;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;border-collapse:collapse;">
     ${rows}
   </table>`;
 }
 
-/** Bloque de dirección de envío. */
+/** Dirección y forma de entrega. */
 export function shippingBlock(data: {
   deliveryMethod?: string;
   shippingAddress?: string;
@@ -179,22 +231,23 @@ export function shippingBlock(data: {
     .map(escapeHtml)
     .join(', ');
   return `
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#262323;border-radius:6px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;border:1px solid ${C.line};">
     <tr>
-      <td style="padding:16px 20px;">
-        ${data.deliveryMethod ? `<p style="margin:0 0 6px;font-size:12px;color:#CCB377;letter-spacing:1px;text-transform:uppercase;">Entrega — ${escapeHtml(data.deliveryMethod)}</p>` : ''}
-        ${address ? `<p style="margin:0;font-size:14px;color:#FFFFFF;line-height:1.5;">${address}</p>` : ''}
+      <td style="padding:18px 20px;">
+        ${data.deliveryMethod ? eyebrow(`Entrega — ${escapeHtml(data.deliveryMethod)}`) : ''}
+        ${address ? `<p style="margin:0;font-family:${SANS};font-size:14px;line-height:1.6;color:${C.ink};">${address}</p>` : ''}
       </td>
     </tr>
   </table>`;
 }
 
-/** Aviso dorado (recuadro) para mensajes importantes. */
+/** Recuadro para lo que no se puede pasar por alto. */
 export function noticeBlock(html: string): string {
   return `
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#262323;border-left:3px solid #CCB377;border-radius:4px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px;background-color:${C.goldSoft};">
     <tr>
-      <td style="padding:16px 20px;font-size:14px;color:#FFFFFF;line-height:1.6;">
+      <td style="width:3px;background-color:${C.gold};">&nbsp;</td>
+      <td style="padding:16px 20px;font-family:${SANS};font-size:14px;line-height:1.65;color:${C.ink};">
         ${html}
       </td>
     </tr>
@@ -202,5 +255,23 @@ export function noticeBlock(html: string): string {
 }
 
 export function paragraph(html: string): string {
-  return `<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#A09A9A;">${html}</p>`;
+  return `<p style="margin:0 0 20px;font-family:${SANS};font-size:15px;line-height:1.7;color:${C.soft};">${html}</p>`;
+}
+
+/** Frase de cierre en serif, para las despedidas de marca. */
+export function signature(html: string): string {
+  return `<p style="margin:28px 0 0;font-family:${SERIF};font-size:16px;line-height:1.6;color:${C.ink};">${html}</p>`;
+}
+
+/** Dato suelto en dos columnas (pedido, fecha, método de pago…). */
+export function dataRows(rows: { label: string; value: string }[]): string {
+  const body = rows
+    .map(
+      (r) => `<tr>
+        <td style="padding:7px 0;font-family:${SANS};font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${C.muted};white-space:nowrap;">${escapeHtml(r.label)}</td>
+        <td style="padding:7px 0;font-family:${SANS};font-size:14px;color:${C.ink};text-align:right;">${escapeHtml(r.value)}</td>
+      </tr>`,
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px;border-collapse:collapse;">${body}</table>`;
 }

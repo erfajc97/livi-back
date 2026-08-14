@@ -15,7 +15,7 @@ export function getWelcomeEmailHtml(
 ): string {
   const body = `
     ${paragraph(
-      `Hola <strong style="color:#FFFFFF;">${escapeHtml(firstName || 'Cliente')}</strong>,
+      `Hola <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(firstName || 'Cliente')}</strong>,
       bienvenido a NonDecants. Tu cuenta ya está lista.`,
     )}
     ${paragraph(

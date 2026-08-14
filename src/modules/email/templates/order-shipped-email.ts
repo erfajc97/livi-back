@@ -30,11 +30,11 @@ export function getOrderShippedEmailHtml(
 
   const intro =
     kind === 'backorder'
-      ? `Hola <strong style="color:#FFFFFF;">${firstName}</strong>, los productos bajo pedido de tu orden
-         <strong style="color:#FFFFFF;">${escapeHtml(data.orderNumber)}</strong> ya fueron despachados.
+      ? `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, los productos bajo pedido de tu orden
+         <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> ya fueron despachados.
          Este es el segundo envío de tu pedido.`
-      : `Hola <strong style="color:#FFFFFF;">${firstName}</strong>, tu pedido
-         <strong style="color:#FFFFFF;">${escapeHtml(data.orderNumber)}</strong> fue despachado.`;
+      : `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, tu pedido
+         <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> fue despachado.`;
 
   const mixedNotice =
     kind === 'partial'
@@ -48,11 +48,11 @@ export function getOrderShippedEmailHtml(
   const body = `
     ${paragraph(intro)}
     ${mixedNotice}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#262323;border-radius:6px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#F3EBDB;border-radius:6px;">
       <tr>
         <td style="padding:16px 20px;">
           <p style="margin:0 0 6px;font-size:12px;color:#CCB377;letter-spacing:1px;text-transform:uppercase;">Guía Servientrega</p>
-          <p style="margin:0;font-size:18px;color:#FFFFFF;font-weight:700;letter-spacing:1px;">${escapeHtml(trackingCode)}</p>
+          <p style="margin:0;font-size:18px;color:#1C1A17;font-weight:600;font-weight:700;letter-spacing:1px;">${escapeHtml(trackingCode)}</p>
         </td>
       </tr>
     </table>

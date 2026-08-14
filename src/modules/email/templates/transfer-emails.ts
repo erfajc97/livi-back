@@ -19,8 +19,8 @@ export function getTransferReceivedEmailHtml(data: OrderEmailData): string {
 
   const body = `
     ${paragraph(
-      `Hola <strong style="color:#FFFFFF;">${firstName}</strong>, recibimos tu orden
-      <strong style="color:#FFFFFF;">${escapeHtml(data.orderNumber)}</strong> junto con tu
+      `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, recibimos tu orden
+      <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> junto con tu
       comprobante de transferencia.`,
     )}
     ${noticeBlock(
@@ -47,8 +47,8 @@ export function getTransferApprovedEmailHtml(data: OrderEmailData): string {
 
   const body = `
     ${paragraph(
-      `Hola <strong style="color:#FFFFFF;">${firstName}</strong>, tu pago fue validado.
-      Tu pedido <strong style="color:#FFFFFF;">${escapeHtml(data.orderNumber)}</strong>
+      `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, tu pago fue validado.
+      Tu pedido <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong>
       fue recibido con éxito y se preparará en breve.`,
     )}
     ${itemsTable(data.items)}
@@ -70,13 +70,13 @@ export function getTransferRejectedEmailHtml(data: OrderEmailData): string {
 
   const body = `
     ${paragraph(
-      `Hola <strong style="color:#FFFFFF;">${firstName}</strong>, tu pedido
-      <strong style="color:#FFFFFF;">${escapeHtml(data.orderNumber)}</strong> fue rechazado
+      `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, tu pedido
+      <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> fue rechazado
       por falta de validación de pago.`,
     )}
     ${noticeBlock(
       `Puedes intentar pagar nuevamente o contactarnos por
-      <a href="https://wa.me/593992305463" style="color:#CCB377;text-decoration:none;">WhatsApp</a>
+      <a href="https://wa.me/593992305463" style="color:#1C1A17;text-decoration:underline;">WhatsApp</a>
       y te ayudamos a completar tu compra.`,
     )}
     ${itemsTable(data.items)}

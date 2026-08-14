@@ -120,6 +120,12 @@ export class AuthService {
     // Reclama cualquier orden guest previa hecha con este email.
     await this.linkGuestOrders(user.id, user.email);
 
+    // M-10 · La cuenta recién queda utilizable acá, no al registrarse: este es
+    // el momento de darle la bienvenida. En segundo plano, como el resto.
+    this.emailService
+      .sendWelcomeEmail(user.email, user.firstName)
+      .catch((err) => console.error('[Auth] M-10 bienvenida falló:', err?.message));
+
     return {
       message: 'Email verificado exitosamente. Ya puedes iniciar sesión.',
     };
