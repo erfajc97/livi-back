@@ -11,6 +11,7 @@ import { Transaction } from '../finance/entities/transaction.entity';
 import { CartModule } from '../cart/cart.module';
 import { ProductsModule } from '../products/products.module';
 import { EmailModule } from '../email/email.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -18,6 +19,8 @@ import { EmailModule } from '../email/email.module';
     CartModule,
     ProductsModule,
     EmailModule,
+    // La venta manual abre cuenta al cliente nuevo que llega por redes.
+    UsersModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

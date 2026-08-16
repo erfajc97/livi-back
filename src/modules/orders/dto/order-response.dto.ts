@@ -45,6 +45,9 @@ export class OrderResponseDto {
   @ApiPropertyOptional({ description: 'Customer phone' })
   customerPhone?: string;
 
+  @ApiPropertyOptional({ description: 'Cédula del comprador (despacho Servientrega)' })
+  customerCedula?: string;
+
   @ApiPropertyOptional({ description: 'Delivery method' })
   deliveryMethod?: string;
 
@@ -68,6 +71,9 @@ export class OrderResponseDto {
 
   @ApiPropertyOptional({ example: 'New York', description: 'Shipping city' })
   shippingCity?: string;
+
+  @ApiPropertyOptional({ example: 'Guayas', description: 'Shipping province' })
+  shippingProvince?: string;
 
   @ApiPropertyOptional({ example: '10001', description: 'Shipping postal code' })
   shippingPostalCode?: string;
@@ -119,6 +125,7 @@ export class OrderResponseDto {
     this.customerName = order.customerName;
     this.customerEmail = order.customerEmail;
     this.customerPhone = order.customerPhone;
+    this.customerCedula = order.customerCedula;
     this.deliveryMethod = order.deliveryMethod;
     this.trackingCode = order.trackingCode;
     this.transferReceiptUrl = order.transferReceiptUrl;
@@ -127,6 +134,7 @@ export class OrderResponseDto {
     this.paymentReference = order.paymentReference;
     this.shippingAddress = order.shippingAddress;
     this.shippingCity = order.shippingCity;
+    this.shippingProvince = order.shippingProvince;
     this.shippingPostalCode = order.shippingPostalCode;
     this.shippingCountry = order.shippingCountry;
     this.notes = order.notes;

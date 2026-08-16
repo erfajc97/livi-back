@@ -71,6 +71,11 @@ export class Order {
   @Column({ nullable: true })
   customerPhone: string;
 
+  // Cédula del comprador: la pide Servientrega para despachar y en la venta
+  // manual es el único lugar donde queda registrada (el cliente llega por redes).
+  @Column({ nullable: true })
+  customerCedula: string;
+
   // Delivery
   @Column({ nullable: true })
   deliveryMethod: string;
@@ -109,6 +114,9 @@ export class Order {
 
   @Column({ nullable: true })
   shippingCity: string;
+
+  @Column({ nullable: true })
+  shippingProvince: string;
 
   @Column({ nullable: true })
   shippingPostalCode: string;

@@ -4,9 +4,11 @@ export class CreateUserAddresses1785940000000 implements MigrationInterface {
     name = 'CreateUserAddresses1785940000000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        // Create user_addresses table
+        // Idempotente: en las bases donde la tabla ya existía (creada por un
+        // synchronize anterior) esta migración abortaba y bloqueaba a todas las
+        // que vienen detrás.
         await queryRunner.query(`
-            CREATE TABLE "user_addresses" (
+            CREATE TABLE IF NOT EXISTS "user_addresses" (
                 "id" BIGSERIAL NOT NULL,
                 "userId" bigint NOT NULL,
                 "alias" character varying NOT NULL,
@@ -23,18 +25,25 @@ export class CreateUserAddresses1785940000000 implements MigrationInterface {
         `);
 
         // Create index
-        await queryRunner.query(`CREATE INDEX "IDX_user_addresses_userId" ON "user_addresses" ("userId")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_user_addresses_userId" ON "user_addresses" ("userId")`);
 
         // Create foreign key
         await queryRunner.query(`
-            ALTER TABLE "user_addresses"
-            ADD CONSTRAINT "FK_user_addresses_userId"
-            FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'FK_user_addresses_userId'
+                ) THEN
+                    ALTER TABLE "user_addresses"
+                    ADD CONSTRAINT "FK_user_addresses_userId"
+                    FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+                END IF;
+            END $$;
         `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "user_addresses" DROP CONSTRAINT "FK_user_addresses_userId"`);
-        await queryRunner.query(`DROP TABLE "user_addresses"`);
+        await queryRunner.query(`ALTER TABLE "user_addresses" DROP CONSTRAINT IF EXISTS "FK_user_addresses_userId"`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "user_addresses"`);
     }
 }

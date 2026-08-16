@@ -406,10 +406,13 @@ export class PaymentsService {
       const notification = await this.orderNotificationService.notifyNewOrder(notificationData).catch(() => ({ whatsappUrl: '' }));
 
       // M-00 · Acuse al cliente. Con tarjeta el acuse se manda al aprobarse el
-      // pago (M-01), pero con efectivo o transferencia nadie le confirmaba
-      // nada: se quedaba sin constancia hasta que un admin revisara el
-      // comprobante. Best-effort: el pedido ya está guardado.
-      if (!isPayphone && savedOrder.customerEmail) {
+      // pago (M-01), pero con efectivo nadie le confirmaba nada: se quedaba sin
+      // constancia hasta que un admin revisara el comprobante.
+      // La transferencia queda fuera: su acuse es M-02, que sale al subir el
+      // comprobante —paso obligatorio del checkout, segundos después—, y mandar
+      // los dos le llegaba al cliente como pedido duplicado.
+      const isTransfer = dto.paymentMethod === 'TRANSFERENCIA';
+      if (!isPayphone && !isTransfer && savedOrder.customerEmail) {
         this.buildOrderEmailData(savedOrder)
           .then((data) => this.emailService.sendOrderPlacedEmail(data))
           .catch((err) =>

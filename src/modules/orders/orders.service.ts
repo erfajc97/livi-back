@@ -13,6 +13,8 @@ import { ProductVariation } from '../products/entities/product-variation.entity'
 import { Transaction } from '../finance/entities/transaction.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
+import { User } from '../users/entities/user.entity';
+import { UsersService } from '../users/users.service';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
 import { OrderStatusHistory } from './entities/order-status-history.entity';
@@ -42,6 +44,7 @@ export class OrdersService {
     private cartService: CartService,
     private stockService: StockService,
     private emailService: EmailService,
+    private usersService: UsersService,
   ) {}
 
   /**
@@ -84,57 +87,82 @@ export class OrdersService {
   }
 
   /**
-   * Correos que dispara un cambio de estado (M-03 a M-08).
+   * Tipo de envío según las líneas del pedido: un pedido con productos bajo
+   * pedido se despacha en dos veces (el primero avisa que falta la otra parte,
+   * el segundo la cierra).
+   */
+  private shipmentKind(order: Order, hadTrackingBefore: boolean): ShipmentKind {
+    const hasBackorder = (order.items ?? []).some(
+      (i) => Number(i.bajoPedidoQuantity ?? 0) > 0,
+    );
+    if (!hasBackorder) return 'full';
+    return hadTrackingBefore ? 'backorder' : 'partial';
+  }
+
+  /**
+   * Correos que dispara una actualización del pedido (M-03 a M-08).
    *
-   * Va en segundo plano y nunca lanza: el pedido ya cambió de estado y un fallo
-   * de correo no puede deshacerlo ni romper la respuesta del panel.
+   * Dos disparadores, no uno: el cambio de estado y la guía. La segunda guía de
+   * un pedido mixto llega cuando el pedido ya está en "Enviado" —sin cambio de
+   * estado que la anuncie—, así que sin mirar `trackingChanged` ese correo
+   * nunca salía.
+   *
+   * Va en segundo plano y nunca lanza: el pedido ya se guardó y un fallo de
+   * correo no puede deshacerlo ni romper la respuesta del panel.
    */
   private notifyStatusChange(
     order: Order,
     previousStatus: OrderStatus,
     hadTrackingBefore: boolean,
+    trackingChanged = false,
   ): void {
-    if (order.status === previousStatus) return;
+    const statusChanged = order.status !== previousStatus;
+    if (!statusChanged && !trackingChanged) return;
 
     const data = this.buildOrderEmailData(order);
-    const isTransfer = order.paymentMethod === 'TRANSFERENCIA';
+    // Con tarjeta la confirmación ya salió al aprobarse el pago (M-01); con
+    // transferencia o efectivo el aviso de "pago confirmado" lo da el admin.
+    const adminConfirmsPayment =
+      order.paymentMethod === 'TRANSFERENCIA' ||
+      order.paymentMethod === 'EFECTIVO';
     const fail = (label: string) => (err: any) =>
       console.error(`[Orders] correo ${label} falló:`, err?.message);
 
+    // M-05 / M-06 / M-07 · guía generada. El disparador real es la guía, venga
+    // con el paso a "Enviado" o después (segunda guía del bajo pedido).
+    if (
+      order.status === OrderStatus.SHIPPED &&
+      order.trackingCode &&
+      (trackingChanged || statusChanged)
+    ) {
+      this.emailService
+        .sendOrderShippedEmail(
+          data,
+          order.trackingCode,
+          this.shipmentKind(order, hadTrackingBefore),
+        )
+        .catch(fail('M-05/06/07'));
+    }
+
+    if (!statusChanged) return;
+
     switch (order.status) {
-      // M-03 · el admin validó el comprobante.
+      // M-03 · el admin confirmó el pago. El panel colapsó "Aceptado" dentro de
+      // "Pagado" (order_received), así que ambos estados valen: si solo se
+      // escuchara ACCEPTED este correo no saldría nunca desde el admin.
       case OrderStatus.ACCEPTED:
-        if (isTransfer) {
+      case OrderStatus.RECEIVED:
+        if (adminConfirmsPayment) {
           this.emailService.sendTransferApprovedEmail(data).catch(fail('M-03'));
         }
         break;
 
       // M-04 · el comprobante no sirvió.
       case OrderStatus.REJECTED:
-        if (isTransfer) {
+        if (order.paymentMethod === 'TRANSFERENCIA') {
           this.emailService.sendTransferRejectedEmail(data).catch(fail('M-04'));
         }
         break;
-
-      // M-05 / M-06 / M-07 · guía generada. Un pedido con líneas bajo pedido se
-      // despacha en dos veces: el primer envío avisa que falta la otra parte y
-      // el segundo (guía nueva sobre un pedido ya despachado) la cierra.
-      case OrderStatus.SHIPPED: {
-        const trackingCode = order.trackingCode;
-        if (!trackingCode) break;
-        const hasBackorder = (order.items ?? []).some(
-          (i) => Number(i.bajoPedidoQuantity ?? 0) > 0,
-        );
-        const kind: ShipmentKind = !hasBackorder
-          ? 'full'
-          : hadTrackingBefore
-            ? 'backorder'
-            : 'partial';
-        this.emailService
-          .sendOrderShippedEmail(data, trackingCode, kind)
-          .catch(fail('M-05/06/07'));
-        break;
-      }
 
       // M-08 · Servientrega marcó la entrega: carta de agradecimiento.
       case OrderStatus.DELIVERED:
@@ -719,6 +747,10 @@ export class OrdersService {
     // (y si un pedido mixto va por su primera o su segunda guía).
     const statusBeforeUpdate = order.status;
     const hadTrackingBefore = Boolean(order.trackingCode);
+    const incomingTracking = updateOrderDto.trackingCode?.trim() || null;
+    const trackingChanged =
+      updateOrderDto.trackingCode !== undefined &&
+      incomingTracking !== (order.trackingCode || null);
 
     // Clients can only update their own orders, and only cancel them
     if (userRole === 'client') {
@@ -739,6 +771,24 @@ export class OrdersService {
           'Order can only be cancelled in CREATED or RECEIVED status',
         );
       }
+    }
+
+    // Guardar la guía es, en la práctica, despachar: el admin escribe el número
+    // de Servientrega y espera que al cliente le llegue su tracking. Si el
+    // pedido todavía no estaba en "Enviado" lo movemos nosotros, para que el
+    // correo salga y el historial refleje el despacho.
+    if (
+      userRole === 'admin' &&
+      trackingChanged &&
+      incomingTracking &&
+      !updateOrderDto.status &&
+      ![
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+        OrderStatus.CANCELLED,
+      ].includes(order.status)
+    ) {
+      updateOrderDto.status = OrderStatus.SHIPPED;
     }
 
     // Determine if stock operations are needed
@@ -773,6 +823,14 @@ export class OrdersService {
           if (!order.paymentStatus || order.paymentStatus === 'pending' || order.paymentStatus === 'receipt_uploaded') {
             order.paymentStatus = 'paid';
           }
+          // El admin puede saltar directo a Enviado/Entregado: sin esto el
+          // pedido quedaba sin fecha de despacho ni de entrega.
+          if (order.status === OrderStatus.SHIPPED && !order.shippedAt) {
+            order.shippedAt = now;
+          }
+          if (order.status === OrderStatus.DELIVERED && !order.deliveredAt) {
+            order.deliveredAt = now;
+          }
           await this.deductStockForOrder(order, queryRunner);
           await this.createCogsTransactionsForOrder(order, queryRunner, now);
         } else if (needsStockRestoration) {
@@ -797,7 +855,12 @@ export class OrdersService {
           updateOrderDto.statusNote,
         );
 
-        this.notifyStatusChange(order, statusBeforeUpdate, hadTrackingBefore);
+        this.notifyStatusChange(
+          order,
+          statusBeforeUpdate,
+          hadTrackingBefore,
+          trackingChanged,
+        );
 
         return new OrderResponseDto(order);
       } catch (error) {
@@ -853,7 +916,12 @@ export class OrdersService {
 
     const updatedOrder = await this.ordersRepository.save(order);
 
-    this.notifyStatusChange(updatedOrder, statusBeforeUpdate, hadTrackingBefore);
+    this.notifyStatusChange(
+      updatedOrder,
+      statusBeforeUpdate,
+      hadTrackingBefore,
+      trackingChanged,
+    );
 
     return new OrderResponseDto(updatedOrder);
   }
@@ -900,45 +968,161 @@ export class OrdersService {
   }
 
   /**
-   * Create a manual order on behalf of a client (admin only).
-   * Manual sales are finalized immediately: paid, delivered, stock deducted,
-   * COGS recorded. No customer-facing notifications are sent.
+   * Create a manual order (admin only).
+   *
+   * El canal de venta manual es "clientes que llegan por redes": lo normal es
+   * que no existan todavía como usuario, así que el admin captura sus datos aquí
+   * y se les abre cuenta (o se reutiliza la que ya tenían por su correo).
+   *
+   * La venta se cierra en el acto: cobrada, stock descontado y COGS registrado.
+   * El estado final depende de la entrega: con guía de Servientrega el pedido
+   * queda en "Pagado" esperando despacho; entregado en mano se marca entregado.
    */
   async createManualOrder(dto: CreateManualOrderDto): Promise<OrderResponseDto> {
-    const user = await this.dataSource.getRepository('User').findOneBy({ id: dto.userId });
+    const customer = await this.resolveManualSaleCustomer(dto);
+    const needsShipment = Boolean(dto.deliveryMethod?.startsWith('SERVIENTREGA'));
 
     const orderDto: CreateOrderDto = {
       items: dto.items,
       paymentMethod: dto.paymentMethod,
-      shippingAddress: (user as any)?.address || undefined,
-      shippingCity: (user as any)?.city || undefined,
+      shippingAddress: customer.address,
+      shippingCity: customer.city,
       notes: dto.notes || '[Venta manual]',
     };
 
-    const created = await this.create(orderDto, dto.userId);
+    const created = await this.create(orderDto, customer.userId);
 
     // Apply discount before finalizing so the recorded total reflects what was charged
     if (dto.discountAmount && dto.discountAmount > 0) {
       const order = await this.ordersRepository.findOne({ where: { id: created.id } });
       if (order) {
         order.total = Math.max(0, Number(order.total) - dto.discountAmount);
+        // Queda registrado como descuento y no como un subtotal más bajo: si
+        // no, el correo muestra subtotal y total que no cuadran entre sí.
+        order.couponDiscount = dto.discountAmount;
         await this.ordersRepository.save(order);
       }
     }
 
-    await this.finalizeManualSale(created.id);
+    const finalized = await this.finalizeManualSale(created.id, {
+      customer,
+      deliveryMethod: dto.deliveryMethod,
+      needsShipment,
+    });
 
-    return this.findOne(created.id, dto.userId);
+    // M-01 · confirmación de compra. El cliente de redes no pasó por el
+    // checkout, así que este correo es su único comprobante.
+    if (finalized.customerEmail) {
+      const data = this.buildOrderEmailData(finalized);
+      this.emailService
+        .sendOrderConfirmationEmail(data)
+        .catch((err) =>
+          console.error('[Orders] correo M-01 (venta manual) falló:', err?.message),
+        );
+    }
+
+    return this.findOne(created.id, customer.userId);
   }
 
   /**
-   * Mark a manual sale as paid + delivered, deduct stock, and create COGS
-   * transactions atomically. Skips customer notifications by design.
+   * Resuelve a quién se le factura la venta manual: un cliente ya registrado o
+   * uno nuevo capturado en el formulario. Con cliente nuevo se busca por correo
+   * antes de crear nada —el mismo comprador puede haber comprado antes por la
+   * web— y solo se crea la cuenta si no existe.
    */
-  private async finalizeManualSale(orderId: number): Promise<void> {
+  private async resolveManualSaleCustomer(
+    dto: CreateManualOrderDto,
+  ): Promise<ManualSaleCustomer> {
+    const usersRepository = this.dataSource.getRepository(User);
+    const input = dto.customer;
+
+    let user: User | null = null;
+
+    if (dto.userId) {
+      user = await usersRepository.findOneBy({ id: dto.userId as any });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${dto.userId} not found`);
+      }
+    } else {
+      const email = input?.email?.trim();
+      if (!email) {
+        throw new BadRequestException(
+          'Indica un cliente existente o los datos del cliente nuevo (nombre y correo).',
+        );
+      }
+
+      user = await usersRepository
+        .createQueryBuilder('u')
+        .where('LOWER(u.email) = LOWER(:email)', { email })
+        .getOne();
+
+      if (!user) {
+        const created = await this.usersService.createGuestAccount({
+          email,
+          firstName: input?.firstName?.trim() || 'Cliente',
+          lastName: input?.lastName?.trim() || '',
+        });
+        user = created.user;
+        // Sus credenciales: con ellas puede entrar a ver el pedido y comprar
+        // después sin pasar de nuevo por el admin.
+        this.emailService
+          .sendGuestAccountEmail(email, user.firstName, created.plainPassword)
+          .catch((err) =>
+            console.error('[Orders] correo de cuenta (venta manual) falló:', err?.message),
+          );
+      }
+    }
+
+    // Completa la ficha del cliente con lo que el admin acaba de capturar, sin
+    // pisar datos que el cliente ya tenía cargados en su cuenta.
+    const patch: Partial<User> = {};
+    const fill = (field: 'phone' | 'cedula' | 'city' | 'province' | 'address') => {
+      const value = input?.[field]?.trim();
+      if (value && !user![field]) patch[field] = value;
+    };
+    (['phone', 'cedula', 'city', 'province', 'address'] as const).forEach(fill);
+    if (Object.keys(patch).length > 0) {
+      await usersRepository.update(user.id as any, patch);
+      Object.assign(user, patch);
+    }
+
+    const name =
+      [input?.firstName?.trim() || user.firstName, input?.lastName?.trim() || user.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim() || 'Cliente';
+
+    return {
+      userId: Number(user.id),
+      name,
+      email: (input?.email?.trim() || user.email) ?? '',
+      phone: input?.phone?.trim() || user.phone || undefined,
+      cedula: input?.cedula?.trim() || user.cedula || undefined,
+      city: input?.city?.trim() || user.city || undefined,
+      province: input?.province?.trim() || user.province || undefined,
+      address: input?.address?.trim() || user.address || undefined,
+    };
+  }
+
+  /**
+   * Cierra la venta manual de forma atómica: cobrada, stock descontado, COGS
+   * registrado y datos del comprador volcados en la orden. Con envío queda en
+   * "Pagado" (la guía la carga el admin después y ahí sale el tracking); en
+   * mano se marca entregada.
+   */
+  private async finalizeManualSale(
+    orderId: number,
+    opts: {
+      customer: ManualSaleCustomer;
+      deliveryMethod?: string;
+      needsShipment: boolean;
+    },
+  ): Promise<Order> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
+    let saved: Order;
 
     try {
       const order = await queryRunner.manager.findOne(Order, {
@@ -951,15 +1135,28 @@ export class OrdersService {
       }
 
       const now = new Date();
+      const { customer } = opts;
+
       order.paymentStatus = 'paid';
-      order.status = OrderStatus.DELIVERED;
+      order.status = opts.needsShipment
+        ? OrderStatus.RECEIVED
+        : OrderStatus.DELIVERED;
       order.receivedAt = order.receivedAt ?? now;
-      order.deliveredAt = now;
+      if (!opts.needsShipment) order.deliveredAt = now;
+
+      order.customerName = customer.name;
+      order.customerEmail = customer.email;
+      order.customerPhone = customer.phone ?? order.customerPhone;
+      order.customerCedula = customer.cedula ?? order.customerCedula;
+      order.shippingAddress = customer.address ?? order.shippingAddress;
+      order.shippingCity = customer.city ?? order.shippingCity;
+      order.shippingProvince = customer.province ?? order.shippingProvince;
+      if (opts.deliveryMethod) order.deliveryMethod = opts.deliveryMethod;
 
       await this.deductStockForOrder(order, queryRunner);
       await this.createCogsTransactionsForOrder(order, queryRunner, now);
 
-      await queryRunner.manager.save(Order, order);
+      saved = await queryRunner.manager.save(Order, order);
       await queryRunner.commitTransaction();
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -967,5 +1164,28 @@ export class OrdersService {
     } finally {
       await queryRunner.release();
     }
+
+    // Historial fuera de la transacción (no es crítico): deja rastro de que el
+    // salto de estado lo hizo la venta manual y no un admin a mano.
+    await this.recordStatusChange(
+      orderId,
+      OrderStatus.CREATED,
+      saved.status,
+      'Venta manual',
+    ).catch(() => {});
+
+    return saved;
   }
+}
+
+/** Datos del comprador ya resueltos para volcarlos en la orden manual. */
+interface ManualSaleCustomer {
+  userId: number;
+  name: string;
+  email: string;
+  phone?: string;
+  cedula?: string;
+  city?: string;
+  province?: string;
+  address?: string;
 }
