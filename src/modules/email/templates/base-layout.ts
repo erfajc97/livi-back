@@ -1,4 +1,10 @@
-import { OrderEmailItem } from '../email.types';
+import {
+  deliveryMethodLabel,
+  formatOrderDate,
+  OrderEmailData,
+  OrderEmailItem,
+  paymentMethodLabel,
+} from '../email.types';
 
 /**
  * Layout base de marca para todos los correos transaccionales de NonDecants.
@@ -50,6 +56,35 @@ export function formatUsd(amount: number): string {
 const SERIF = `Georgia,'Times New Roman',serif`;
 const SANS = `'Helvetica Neue',Helvetica,Arial,sans-serif`;
 
+/**
+ * URL absoluta del logo. Los clientes de correo no resuelven rutas relativas,
+ * así que sale de `MAIL_LOGO_URL` o, por defecto, del front público.
+ * `FRONTEND_URL` puede traer varios orígenes separados por coma (CORS): manda
+ * el primero, igual que en EmailService.
+ */
+function brandLogoUrl(): string {
+  const explicit = (process.env.MAIL_LOGO_URL ?? '').trim();
+  if (explicit) return explicit;
+  const front = (process.env.FRONTEND_URL ?? '')
+    .split(',')[0]
+    .trim()
+    .replace(/\/+$/, '');
+  return front ? `${front}/logonondecants.png` : '';
+}
+
+/**
+ * Cabecera de marca: el logo, no el nombre escrito. Si no hay URL configurada
+ * cae al texto para no dejar el correo decapitado.
+ */
+function brandHeader(): string {
+  const logo = brandLogoUrl();
+  if (!logo) {
+    return `<span style="font-family:${SERIF};font-size:22px;letter-spacing:5px;text-transform:uppercase;color:${C.ink};">${BRAND_NAME}</span>`;
+  }
+  // `alt` con el nombre: si el cliente bloquea imágenes, la marca sigue ahí.
+  return `<img src="${logo}" alt="${BRAND_NAME}" width="180" style="display:block;width:180px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;">`;
+}
+
 /** Rótulo pequeño en versalitas, el mismo recurso que el sitio. */
 export function eyebrow(text: string): string {
   return `<p style="margin:0 0 10px;font-family:${SANS};font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:${C.muted};">${text}</p>`;
@@ -81,9 +116,7 @@ export function baseEmailLayout(
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;">
           <tr>
             <td align="center" style="padding:8px 0 22px;">
-              <span style="font-family:${SERIF};font-size:22px;letter-spacing:5px;text-transform:uppercase;color:${C.ink};">
-                NonDecants
-              </span>
+              ${brandHeader()}
             </td>
           </tr>
         </table>
@@ -152,21 +185,33 @@ export function fallbackLink(url: string): string {
   </p>`;
 }
 
-/** Detalle del pedido: una línea por producto, con hairlines. */
+/**
+ * Detalle del pedido: Producto · Cantidad · Precio, con hairlines.
+ *
+ * Las tres columnas llevan padding lateral propio; sin él, el nombre largo y
+ * el precio se tocaban ("Turathi electric$13.00") porque en correo no hay
+ * `gap` y las celdas se pegan.
+ */
 export function itemsTable(items: OrderEmailItem[]): string {
+  const headCell = (text: string, align: 'left' | 'center' | 'right') =>
+    `<th style="padding:0 0 10px;font-family:${SANS};font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:${C.muted};text-align:${align};border-bottom:1px solid ${C.line};">${text}</th>`;
+
   const rows = items
     .map((i) => {
       const detail = i.ml ? `${i.ml} ml` : 'Botella completa';
       const backorder =
         i.bajoPedidoQuantity && i.bajoPedidoQuantity > 0
-          ? `<span style="color:${C.gold};"> · ${i.bajoPedidoQuantity} bajo pedido</span>`
+          ? `<br><span style="font-size:12px;color:${C.gold};">${i.bajoPedidoQuantity} bajo pedido</span>`
           : '';
       return `<tr>
-        <td style="padding:14px 0;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;line-height:1.5;color:${C.ink};">
+        <td style="padding:14px 12px 14px 0;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;line-height:1.5;color:${C.ink};vertical-align:top;">
           <span style="font-family:${SERIF};font-size:16px;">${escapeHtml(i.name)}</span><br>
-          <span style="font-size:12px;color:${C.muted};">${i.quantity} × ${detail}${backorder}</span>
+          <span style="font-size:12px;color:${C.muted};">${detail}</span>${backorder}
         </td>
-        <td style="padding:14px 0;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;color:${C.ink};text-align:right;white-space:nowrap;vertical-align:top;">
+        <td style="padding:14px 12px;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;color:${C.soft};text-align:center;white-space:nowrap;vertical-align:top;">
+          ${i.quantity}
+        </td>
+        <td style="padding:14px 0 14px 12px;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;color:${C.ink};text-align:right;white-space:nowrap;vertical-align:top;">
           ${formatUsd(i.price * i.quantity)}
         </td>
       </tr>`;
@@ -175,7 +220,12 @@ export function itemsTable(items: OrderEmailItem[]): string {
 
   return `
   ${eyebrow('Tu pedido')}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;border-collapse:collapse;border-top:1px solid ${C.line};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;border-collapse:collapse;table-layout:auto;">
+    <tr>
+      ${headCell('Producto', 'left')}
+      ${headCell('Cant.', 'center')}
+      ${headCell('Precio', 'right')}
+    </tr>
     ${rows}
   </table>`;
 }
@@ -195,17 +245,19 @@ export function totalsTable(data: {
     </tr>`;
 
   let rows = line('Subtotal', formatUsd(data.subtotal));
-  if (data.deliveryCost != null) {
-    rows += line(
-      'Envío',
-      data.deliveryCost > 0 ? formatUsd(data.deliveryCost) : 'Gratis',
-    );
-  }
+  // Cupón y recargo solo aparecen si los hubo: una línea en $0.00 hace dudar
+  // al cliente de si le cobraron algo.
   if (data.couponDiscount && data.couponDiscount > 0) {
-    rows += line('Descuento', `-${formatUsd(data.couponDiscount)}`);
+    rows += line('Cupón aplicado', `-${formatUsd(data.couponDiscount)}`);
   }
   if (data.payphoneSurcharge && data.payphoneSurcharge > 0) {
-    rows += line('Recargo Payphone (6%)', formatUsd(data.payphoneSurcharge));
+    rows += line('Fee de Payphone (6%)', formatUsd(data.payphoneSurcharge));
+  }
+  if (data.deliveryCost != null) {
+    rows += line(
+      'Gastos de envío',
+      data.deliveryCost > 0 ? formatUsd(data.deliveryCost) : 'Gratis',
+    );
   }
   rows += `
     <tr>
@@ -230,12 +282,39 @@ export function shippingBlock(data: {
     .filter(Boolean)
     .map(escapeHtml)
     .join(', ');
+  // El método llega como código; en el correo va su nombre real.
+  const method = deliveryMethodLabel(data.deliveryMethod);
   return `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;border:1px solid ${C.line};">
     <tr>
       <td style="padding:18px 20px;">
-        ${data.deliveryMethod ? eyebrow(`Entrega — ${escapeHtml(data.deliveryMethod)}`) : ''}
+        ${eyebrow('Dirección de entrega')}
+        ${method ? `<p style="margin:0 0 6px;font-family:${SANS};font-size:13px;line-height:1.6;color:${C.soft};">${escapeHtml(method)}</p>` : ''}
         ${address ? `<p style="margin:0;font-family:${SANS};font-size:14px;line-height:1.6;color:${C.ink};">${address}</p>` : ''}
+      </td>
+    </tr>
+  </table>`;
+}
+
+/**
+ * Botón de WhatsApp para el cierre de los correos de pedido: es el canal por
+ * el que el cliente realmente escribe, y buscar el número en el pie no cuenta.
+ */
+export function whatsappButton(
+  label = 'Escríbenos por WhatsApp',
+  message?: string,
+): string {
+  const url = message
+    ? `${BRAND_WHATSAPP_URL}?text=${encodeURIComponent(message)}`
+    : BRAND_WHATSAPP_URL;
+  return `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 8px;">
+    <tr>
+      <td align="center">
+        <a href="${url}"
+           style="display:inline-block;padding:14px 34px;background-color:${C.card};border:1px solid ${C.ink};color:${C.ink};font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;text-decoration:none;">
+          ${label}
+        </a>
       </td>
     </tr>
   </table>`;
@@ -261,6 +340,39 @@ export function paragraph(html: string): string {
 /** Frase de cierre en serif, para las despedidas de marca. */
 export function signature(html: string): string {
   return `<p style="margin:28px 0 0;font-family:${SERIF};font-size:16px;line-height:1.6;color:${C.ink};">${html}</p>`;
+}
+
+/**
+ * Saludo con nombre y apellido. El cliente escribió su nombre completo en el
+ * checkout; cortarlo al primero hacía sonar el correo a plantilla genérica.
+ */
+export function greeting(data: OrderEmailData): string {
+  const name = escapeHtml((data.customerName || '').trim() || 'Cliente');
+  return paragraph(
+    `Hola <strong style="color:${C.ink};font-weight:600;">${name}</strong>,`,
+  );
+}
+
+/** Bloque "Detalles del pedido": número, fecha de creación y forma de pago. */
+export function orderFacts(data: OrderEmailData): string {
+  const rows: { label: string; value: string }[] = [
+    { label: 'Pedido', value: data.orderNumber },
+  ];
+  const created = formatOrderDate(data.createdAt);
+  if (created) rows.push({ label: 'Fecha de creación', value: created });
+  const payment = paymentMethodLabel(data.paymentMethod);
+  if (payment) rows.push({ label: 'Método de pago', value: payment });
+  return `${eyebrow('Detalles del pedido')}${dataRows(rows)}`;
+}
+
+/** Cierre estándar de los correos de pedido: consulta por WhatsApp. */
+export function whatsappClosing(orderNumber: string): string {
+  return `
+    ${paragraph('Cualquier duda no dudes en consultarnos por WhatsApp:')}
+    ${whatsappButton(
+      'Escríbenos por WhatsApp',
+      `Hola, tengo una consulta sobre mi pedido ${orderNumber}`,
+    )}`;
 }
 
 /** Dato suelto en dos columnas (pedido, fecha, método de pago…). */

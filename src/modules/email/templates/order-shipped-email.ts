@@ -2,9 +2,12 @@ import {
   baseEmailLayout,
   ctaButton,
   escapeHtml,
+  greeting,
   itemsTable,
   noticeBlock,
   paragraph,
+  shippingBlock,
+  whatsappClosing,
 } from './base-layout';
 import {
   OrderEmailData,
@@ -25,16 +28,14 @@ export function getOrderShippedEmailHtml(
   trackingCode: string,
   kind: ShipmentKind,
 ): string {
-  const firstName = escapeHtml((data.customerName || '').split(' ')[0] || 'Cliente');
   const trackingUrl = servientregaTrackingUrl(trackingCode);
 
   const intro =
     kind === 'backorder'
-      ? `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, los productos bajo pedido de tu orden
+      ? `Los productos bajo pedido de tu orden
          <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> ya fueron despachados.
          Este es el segundo envío de tu pedido.`
-      : `Hola <strong style="color:#1C1A17;font-weight:600;">${firstName}</strong>, tu pedido
-         <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> fue despachado.`;
+      : `Tu pedido <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> fue despachado.`;
 
   const mixedNotice =
     kind === 'partial'
@@ -46,6 +47,7 @@ export function getOrderShippedEmailHtml(
       : '';
 
   const body = `
+    ${greeting(data)}
     ${paragraph(intro)}
     ${mixedNotice}
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#F3EBDB;border-radius:6px;">
@@ -58,9 +60,11 @@ export function getOrderShippedEmailHtml(
     </table>
     ${ctaButton('Rastrear mi envío', trackingUrl)}
     ${itemsTable(data.items)}
+    ${shippingBlock(data)}
     ${paragraph(
-      `También puedes revisar el estado de tu pedido cuando quieras desde tu cuenta en NonDecants.`,
+      'También puedes revisar el estado de tu pedido cuando quieras desde tu cuenta en NonDecants.',
     )}
+    ${whatsappClosing(data.orderNumber)}
   `;
 
   return baseEmailLayout('Tu pedido fue despachado', body);

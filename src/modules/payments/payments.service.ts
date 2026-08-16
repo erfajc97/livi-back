@@ -100,6 +100,7 @@ export class PaymentsService {
       customerEmail: order.customerEmail,
       customerPhone: order.customerPhone,
       paymentMethod: order.paymentMethod,
+      createdAt: order.createdAt,
       deliveryMethod: order.deliveryMethod,
       shippingAddress: order.shippingAddress,
       shippingCity: order.shippingCity,
@@ -403,6 +404,18 @@ export class PaymentsService {
         items: notificationItems,
       };
       const notification = await this.orderNotificationService.notifyNewOrder(notificationData).catch(() => ({ whatsappUrl: '' }));
+
+      // M-00 · Acuse al cliente. Con tarjeta el acuse se manda al aprobarse el
+      // pago (M-01), pero con efectivo o transferencia nadie le confirmaba
+      // nada: se quedaba sin constancia hasta que un admin revisara el
+      // comprobante. Best-effort: el pedido ya está guardado.
+      if (!isPayphone && savedOrder.customerEmail) {
+        this.buildOrderEmailData(savedOrder)
+          .then((data) => this.emailService.sendOrderPlacedEmail(data))
+          .catch((err) =>
+            console.error('[Payments] M-00 acuse de pedido falló:', err?.message),
+          );
+      }
 
       // If PayPhone, create payment link (after commit so order exists regardless)
       if (isPayphone) {

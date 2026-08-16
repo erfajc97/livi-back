@@ -70,6 +70,7 @@ export class OrdersService {
       customerEmail: order.customerEmail,
       customerPhone: order.customerPhone,
       paymentMethod: order.paymentMethod,
+      createdAt: order.createdAt,
       deliveryMethod: order.deliveryMethod,
       shippingAddress: order.shippingAddress,
       shippingCity: order.shippingCity,

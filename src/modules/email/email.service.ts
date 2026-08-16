@@ -8,7 +8,12 @@ import {
 } from './templates/password-reset-email';
 import { getGuestAccountEmailHtml } from './templates/guest-account-email';
 import { getAdminPasswordResetEmailHtml } from './templates/admin-password-reset-email';
-import { getOrderConfirmationEmailHtml } from './templates/order-confirmation-email';
+import {
+  getOrderConfirmationEmailHtml,
+  getOrderConfirmationSubject,
+  getOrderPlacedEmailHtml,
+  getOrderPlacedSubject,
+} from './templates/order-confirmation-email';
 import {
   getTransferApprovedEmailHtml,
   getTransferReceivedEmailHtml,
@@ -207,9 +212,23 @@ export class EmailService {
   async sendOrderConfirmationEmail(data: OrderEmailData): Promise<void> {
     await this.send(
       data.customerEmail,
-      `Pedido confirmado ${data.orderNumber} — NonDecants`,
+      getOrderConfirmationSubject(data.orderNumber),
       getOrderConfirmationEmailHtml(data),
       'Confirmación de pedido (M-01)',
+    );
+  }
+
+  /**
+   * M-00 · Pedido creado con efectivo o transferencia. Acuse inmediato: el
+   * pago aún no está validado, pero el cliente necesita constancia de que su
+   * pedido entró.
+   */
+  async sendOrderPlacedEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      data.customerEmail,
+      getOrderPlacedSubject(data.orderNumber),
+      getOrderPlacedEmailHtml(data),
+      'Acuse de pedido (M-00)',
     );
   }
 
