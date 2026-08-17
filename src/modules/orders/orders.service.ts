@@ -13,6 +13,10 @@ import { ProductVariation } from '../products/entities/product-variation.entity'
 import { Transaction } from '../finance/entities/transaction.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
+import {
+  getDeliveryCost,
+  requiresShipment,
+} from '../../common/constants/delivery-methods';
 import { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -980,7 +984,10 @@ export class OrdersService {
    */
   async createManualOrder(dto: CreateManualOrderDto): Promise<OrderResponseDto> {
     const customer = await this.resolveManualSaleCustomer(dto);
-    const needsShipment = Boolean(dto.deliveryMethod?.startsWith('SERVIENTREGA'));
+    const needsShipment = requiresShipment(dto.deliveryMethod);
+    // El costo del envío sale de la tabla del servidor, no del panel: la venta
+    // manual cobra lo mismo que la tienda por la misma entrega.
+    const deliveryCost = getDeliveryCost(dto.deliveryMethod);
 
     const orderDto: CreateOrderDto = {
       items: dto.items,
@@ -992,14 +999,18 @@ export class OrdersService {
 
     const created = await this.create(orderDto, customer.userId);
 
-    // Apply discount before finalizing so the recorded total reflects what was charged
-    if (dto.discountAmount && dto.discountAmount > 0) {
+    // Descuento y envío antes de cerrar, para que el total guardado sea el que
+    // se cobró: subtotal - descuento + envío.
+    const discount = Math.max(0, dto.discountAmount ?? 0);
+    if (discount > 0 || deliveryCost > 0) {
       const order = await this.ordersRepository.findOne({ where: { id: created.id } });
       if (order) {
-        order.total = Math.max(0, Number(order.total) - dto.discountAmount);
-        // Queda registrado como descuento y no como un subtotal más bajo: si
+        const subtotal = Number(order.subtotal ?? order.total);
+        // El descuento queda registrado como tal y no rebajando el subtotal: si
         // no, el correo muestra subtotal y total que no cuadran entre sí.
-        order.couponDiscount = dto.discountAmount;
+        order.couponDiscount = discount;
+        order.deliveryCost = deliveryCost;
+        order.total = Math.max(0, subtotal - discount) + deliveryCost;
         await this.ordersRepository.save(order);
       }
     }
@@ -1010,16 +1021,25 @@ export class OrdersService {
       needsShipment,
     });
 
+    const data = this.buildOrderEmailData(finalized);
+
     // M-01 · confirmación de compra. El cliente de redes no pasó por el
     // checkout, así que este correo es su único comprobante.
     if (finalized.customerEmail) {
-      const data = this.buildOrderEmailData(finalized);
       this.emailService
         .sendOrderConfirmationEmail(data)
         .catch((err) =>
           console.error('[Orders] correo M-01 (venta manual) falló:', err?.message),
         );
     }
+
+    // M-13 · alerta interna. Una venta manual es una orden como cualquier otra:
+    // tiene que aparecer en el correo donde el admin lleva el control de pedidos.
+    this.emailService
+      .sendAdminNewOrderEmail(data)
+      .catch((err) =>
+        console.error('[Orders] correo M-13 (venta manual) falló:', err?.message),
+      );
 
     return this.findOne(created.id, customer.userId);
   }

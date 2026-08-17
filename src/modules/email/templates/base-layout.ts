@@ -25,6 +25,10 @@ export const BRAND_NAME = 'NonDecants';
 export const BRAND_WHATSAPP = '0992305463';
 export const BRAND_WHATSAPP_URL = 'https://wa.me/593992305463';
 export const BRAND_CONTACT_EMAIL = 'contacto@nondecants.com';
+/** Sitio público: respaldo para el logo cuando FRONTEND_URL no sirve. */
+export const PUBLIC_SITE_URL = 'https://nondecants.com';
+/** El logo oficial vive en el `public/` del front. */
+export const BRAND_LOGO_PATH = '/logonondecants.png';
 
 /** Paleta Atelier, la misma del sitio. */
 const C = {
@@ -51,10 +55,21 @@ export function formatUsd(amount: number): string {
   return `$${Number(amount || 0).toFixed(2)}`;
 }
 
-// Cormorant no existe en los clientes de correo: Georgia es la serif que más
-// se le parece y está en todos lados.
-const SERIF = `Georgia,'Times New Roman',serif`;
-const SANS = `'Helvetica Neue',Helvetica,Arial,sans-serif`;
+// La serif del sitio (Cormorant Garamond) va primero y se carga por webfont:
+// Apple Mail, iOS y Outlook para Mac la respetan y el correo queda con la misma
+// letra curva de la web. Gmail ignora webfonts y cae a Georgia, que es la que
+// más se le parece de las instaladas en todos lados.
+const SERIF = `'Cormorant Garamond','Cormorant',Georgia,'Times New Roman',serif`;
+const SANS = `'DM Sans','Helvetica Neue',Helvetica,Arial,sans-serif`;
+
+/** Carga de las fuentes de marca. Va en el <head> de cada correo. */
+const FONT_IMPORT = `
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap');
+  </style>`;
 
 /**
  * URL absoluta del logo. Los clientes de correo no resuelven rutas relativas,
@@ -69,7 +84,13 @@ function brandLogoUrl(): string {
     .split(',')[0]
     .trim()
     .replace(/\/+$/, '');
-  return front ? `${front}/logonondecants.png` : '';
+  // localhost no sirve como fuente del logo: el correo se abre en el cliente,
+  // no en la máquina que lo generó, y la imagen sale rota. Con FRONTEND_URL mal
+  // configurado (o sin configurar) se cae al sitio público antes que a texto.
+  const usableFront = front && !/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(front)
+    ? front
+    : PUBLIC_SITE_URL;
+  return `${usableFront}${BRAND_LOGO_PATH}`;
 }
 
 /**
@@ -91,6 +112,22 @@ export function eyebrow(text: string): string {
 }
 
 /**
+ * Título de sección: serif de marca sobre filete dorado. Los rótulos en gris
+ * diminuto se perdían y el correo se leía como un bloque plano; cada sección
+ * (pedido, totales, entrega) tiene que verse de un vistazo.
+ */
+export function sectionTitle(text: string): string {
+  return `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px;">
+    <tr>
+      <td style="padding:0 0 6px;font-family:${SERIF};font-size:20px;line-height:1.25;font-weight:600;color:${C.ink};border-bottom:2px solid ${C.gold};">
+        ${text}
+      </td>
+    </tr>
+  </table>`;
+}
+
+/**
  * Envuelve el contenido en el layout de marca.
  * `title` es el titular serif de la tarjeta; `eyebrowText` el rótulo de arriba.
  */
@@ -106,6 +143,7 @@ export function baseEmailLayout(
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>${escapeHtml(title)}</title>
+  ${FONT_IMPORT}
 </head>
 <body style="margin:0;padding:0;background-color:${C.page};font-family:${SANS};-webkit-font-smoothing:antialiased;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${C.page};">
@@ -128,9 +166,13 @@ export function baseEmailLayout(
           <tr>
             <td style="padding:40px 44px 44px;">
               ${eyebrowText ? eyebrow(eyebrowText) : ''}
-              <h1 style="margin:0 0 22px;font-family:${SERIF};font-size:30px;line-height:1.15;font-weight:400;color:${C.ink};">
+              <h1 style="margin:0 0 8px;font-family:${SERIF};font-size:34px;line-height:1.15;font-weight:600;color:${C.ink};">
                 ${title}
               </h1>
+              <!-- Filete corto bajo el titular: separa el título del cuerpo -->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+                <tr><td style="width:56px;height:2px;line-height:2px;font-size:0;background-color:${C.gold};">&nbsp;</td></tr>
+              </table>
               ${bodyHtml}
             </td>
           </tr>
@@ -219,7 +261,7 @@ export function itemsTable(items: OrderEmailItem[]): string {
     .join('');
 
   return `
-  ${eyebrow('Tu pedido')}
+  ${sectionTitle('Tu pedido')}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;border-collapse:collapse;table-layout:auto;">
     <tr>
       ${headCell('Producto', 'left')}
@@ -261,8 +303,8 @@ export function totalsTable(data: {
   }
   rows += `
     <tr>
-      <td style="padding:14px 0 0;border-top:1px solid ${C.line};font-family:${SANS};font-size:11px;letter-spacing:2px;text-transform:uppercase;color:${C.muted};">Total</td>
-      <td style="padding:14px 0 0;border-top:1px solid ${C.line};font-family:${SERIF};font-size:22px;color:${C.ink};text-align:right;">${formatUsd(data.total)}</td>
+      <td style="padding:14px 0 0;border-top:1px solid ${C.line};font-family:${SERIF};font-size:18px;font-weight:600;color:${C.ink};">Total</td>
+      <td style="padding:14px 0 0;border-top:1px solid ${C.line};font-family:${SERIF};font-size:26px;font-weight:600;color:${C.ink};text-align:right;">${formatUsd(data.total)}</td>
     </tr>`;
 
   return `
@@ -288,7 +330,7 @@ export function shippingBlock(data: {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;border:1px solid ${C.line};">
     <tr>
       <td style="padding:18px 20px;">
-        ${eyebrow('Dirección de entrega')}
+        ${sectionTitle('Dirección de entrega')}
         ${method ? `<p style="margin:0 0 6px;font-family:${SANS};font-size:13px;line-height:1.6;color:${C.soft};">${escapeHtml(method)}</p>` : ''}
         ${address ? `<p style="margin:0;font-family:${SANS};font-size:14px;line-height:1.6;color:${C.ink};">${address}</p>` : ''}
       </td>
@@ -362,7 +404,7 @@ export function orderFacts(data: OrderEmailData): string {
   if (created) rows.push({ label: 'Fecha de creación', value: created });
   const payment = paymentMethodLabel(data.paymentMethod);
   if (payment) rows.push({ label: 'Método de pago', value: payment });
-  return `${eyebrow('Detalles del pedido')}${dataRows(rows)}`;
+  return `${sectionTitle('Detalles del pedido')}${dataRows(rows)}`;
 }
 
 /** Cierre estándar de los correos de pedido: consulta por WhatsApp. */

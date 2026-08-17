@@ -18,6 +18,7 @@ import { StockService } from '../products/stock.service';
 import { OrderStatusHistory } from '../orders/entities/order-status-history.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { OrderNotificationService } from '../../common/services/order-notification.service';
+import { DELIVERY_COSTS } from '../../common/constants/delivery-methods';
 import { CouponsService } from '../coupons/coupons.service';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
@@ -300,8 +301,15 @@ export class PaymentsService {
         }
       }
 
-      // Calculate costs
-      let deliveryCost = Math.max(0, dto.deliveryCost ?? 0);
+      // Calculate costs. El envío sale de la tabla del servidor cuando el
+      // método es conocido: así una tarifa desactualizada en el navegador (o
+      // manipulada) no decide cuánto se cobra. Si el método no está en la
+      // tabla, se respeta lo que mandó el checkout.
+      const tabulatedDelivery = DELIVERY_COSTS[dto.deliveryMethod ?? ''];
+      let deliveryCost =
+        tabulatedDelivery != null
+          ? tabulatedDelivery
+          : Math.max(0, dto.deliveryCost ?? 0);
 
       // Cupón: SIEMPRE validado en el servidor (no se confía en
       // couponDiscount enviado por el cliente). Solo se aplica si el código

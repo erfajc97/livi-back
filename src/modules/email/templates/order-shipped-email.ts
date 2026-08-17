@@ -52,9 +52,12 @@ export function getOrderShippedEmailHtml(
     ${mixedNotice}
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#F3EBDB;border-radius:6px;">
       <tr>
-        <td style="padding:16px 20px;">
-          <p style="margin:0 0 6px;font-size:12px;color:#CCB377;letter-spacing:1px;text-transform:uppercase;">Guía Servientrega</p>
-          <p style="margin:0;font-size:18px;color:#1C1A17;font-weight:600;font-weight:700;letter-spacing:1px;">${escapeHtml(trackingCode)}</p>
+        <td style="width:3px;background-color:#CCB377;">&nbsp;</td>
+        <td style="padding:18px 22px;">
+          <p style="margin:0 0 6px;font-family:'Cormorant Garamond','Cormorant',Georgia,serif;font-size:20px;font-weight:600;color:#1C1A17;">Guía Servientrega</p>
+          <!-- El número va en sans: la serif de marca usa cifras antiguas, que
+               en un código de guía se leen mal y se copian peor. -->
+          <p style="margin:0;font-family:'DM Sans','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:24px;line-height:1.2;color:#1C1A17;font-weight:600;letter-spacing:2px;">${escapeHtml(trackingCode)}</p>
         </td>
       </tr>
     </table>
