@@ -26,7 +26,8 @@
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/config/data-source.ts",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeders/index.ts",
     "seed:prod": "node dist/database/seeders/index.js",
-    "export:openapi": "ts-node --transpile-only -r tsconfig-paths/register scripts/export-openapi.ts"
+    "export:openapi": "ts-node --transpile-only -r tsconfig-paths/register scripts/export-openapi.ts",
+    "cleanup:prod": "ts-node --transpile-only -r tsconfig-paths/register scripts/cleanup-prod-data.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.996.0",
