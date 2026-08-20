@@ -16,6 +16,11 @@
 #   bash scripts/limpiar-prod.sh --keep=otro@mail.com --wipe-subscribers
 #   bash scripts/limpiar-prod.sh --find=turathi          # solo busca, no borra
 #   bash scripts/limpiar-prod.sh --products=41           # borra ademas ese producto
+#   bash scripts/limpiar-prod.sh --combos=3              # borra ademas ese combo
+#
+# --find lista productos Y combos que coinciden (por nombre, o combos que
+# contienen un producto con ese nombre), con sus ids. Sirve para elegir el id
+# exacto antes de borrar nada.
 set -euo pipefail
 
 API_CONTAINER="${API_CONTAINER:-api-ecommerce}"

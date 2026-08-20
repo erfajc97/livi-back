@@ -12,6 +12,7 @@
  *   npm run cleanup:prod -- --keep=otro@mail.com
  *   npm run cleanup:prod -- --keep-order-ids=12,15
  *   npm run cleanup:prod -- --products=41,58 --apply
+ *   npm run cleanup:prod -- --combos=3 --apply
  *   npm run cleanup:prod -- --wipe-subscribers --wipe-order-finance --apply
  */
 import { DataSource } from 'typeorm';
@@ -24,6 +25,7 @@ type Args = {
   keepEmails: string[];
   keepOrderIds: string[];
   productIds: string[];
+  comboIds: string[];
   wipeSubscribers: boolean;
   wipeOrderFinance: boolean;
   keepOrders: boolean;
@@ -47,6 +49,7 @@ function parseArgs(): Args {
     keepEmails: list('keep').map((e) => e.toLowerCase()),
     keepOrderIds: list('keep-order-ids'),
     productIds: list('products'),
+    comboIds: list('combos'),
     wipeSubscribers: raw.includes('--wipe-subscribers'),
     wipeOrderFinance: raw.includes('--wipe-order-finance'),
     keepOrders: raw.includes('--keep-orders'),
@@ -102,6 +105,43 @@ async function main() {
         `    #${p.id} "${p.name}" — ${p.marca} — $${p.price} — ${p.isActive ? 'activo' : 'inactivo'}`,
       ),
     );
+
+    const combos: {
+      id: string;
+      name: string;
+      precio: string;
+      isActive: boolean;
+      padre: string | null;
+    }[] = await ds.query(
+      `SELECT c.id::text, c.name, c."finalPrice"::text AS precio, c."isActive",
+              c."parentComboId"::text AS padre
+         FROM combos c
+        WHERE c.name ILIKE $1
+           OR EXISTS (SELECT 1 FROM combo_products cp
+                        JOIN products p2 ON p2.id = cp."productId"
+                       WHERE cp."comboId" = c.id AND p2.name ILIKE $1)
+        ORDER BY c.id`,
+      [`%${args.find}%`],
+    );
+    console.log(`\nCOMBOS que coinciden (por nombre o por producto que traen) — ${combos.length}:`);
+    for (const c of combos) {
+      console.log(
+        `    #${c.id} "${c.name}" — $${c.precio} — ${c.isActive ? 'activo' : 'inactivo'}` +
+          `${c.padre ? ` — versión del combo #${c.padre}` : ''}`,
+      );
+      const items: { name: string | null; quantity: number }[] = await ds.query(
+        `SELECT p.name, cp.quantity
+           FROM combo_products cp
+           LEFT JOIN products p ON p.id = cp."productId"
+          WHERE cp."comboId" = $1::bigint
+          ORDER BY cp.id`,
+        [c.id],
+      );
+      items.forEach((i) =>
+        console.log(`        · ${i.quantity}x ${i.name || '(producto borrado)'}`),
+      );
+    }
+
     console.log('\nBúsqueda terminada. Nada fue borrado.');
     await ds.destroy();
     return;
@@ -198,6 +238,50 @@ async function main() {
     console.log('    ⚠ VERIFICA LOS NOMBRES DE ARRIBA antes de correr con --apply.');
   }
 
+  // ----------------------------------------------------------------- combos
+  if (args.comboIds.length) {
+    const combos: {
+      id: string;
+      name: string;
+      precio: string;
+      isActive: boolean;
+      padre: string | null;
+    }[] = await ds.query(
+      `SELECT id::text, name, "finalPrice"::text AS precio, "isActive", "parentComboId"::text AS padre
+         FROM combos WHERE id = ANY($1::bigint[]) ORDER BY id`,
+      [args.comboIds],
+    );
+    console.log(`\nCOMBOS a borrar (${combos.length} de ${args.comboIds.length} ids pedidos):`);
+    for (const c of combos) {
+      console.log(
+        `    #${c.id} "${c.name}" — $${c.precio} — ${c.isActive ? 'activo' : 'inactivo'}` +
+          `${c.padre ? ` — versión del combo #${c.padre}` : ''}`,
+      );
+      const items: { name: string | null; quantity: number }[] = await ds.query(
+        `SELECT p.name, cp.quantity
+           FROM combo_products cp
+           LEFT JOIN products p ON p.id = cp."productId"
+          WHERE cp."comboId" = $1::bigint
+          ORDER BY cp.id`,
+        [c.id],
+      );
+      items.forEach((i) =>
+        console.log(`        · ${i.quantity}x ${i.name || '(producto borrado)'}`),
+      );
+    }
+    const versions: { id: string; name: string }[] = await ds.query(
+      `SELECT id::text, name FROM combos WHERE "parentComboId" = ANY($1::bigint[]) ORDER BY id`,
+      [args.comboIds],
+    );
+    if (versions.length) {
+      console.log(`    ⚠ arrastra ${versions.length} versión(es) hija(s) (ON DELETE CASCADE):`);
+      versions.forEach((v) => console.log(`        #${v.id} "${v.name}"`));
+    }
+    const missingCombos = args.comboIds.filter((id) => !combos.some((c) => c.id === id));
+    if (missingCombos.length) console.log(`    ⚠ ids inexistentes: ${missingCombos.join(', ')}`);
+    console.log('    ⚠ Borra el combo, NO los productos que contiene.');
+  }
+
   if (!args.apply) {
     console.log('\nDRY-RUN terminado. Nada fue borrado. Repite con --apply para ejecutar.');
     await ds.destroy();
@@ -279,6 +363,24 @@ async function main() {
         'transactions restantes de órdenes',
         `DELETE FROM transactions WHERE "referenceType" LIKE 'order_%'`,
       );
+    }
+
+    if (args.comboIds.length) {
+      // combo_products y las versiones hijas caen por CASCADE; se borran
+      // explícito igual para que el conteo quede en el log.
+      await del(
+        'combo_products del combo',
+        `DELETE FROM combo_products
+          WHERE "comboId" = ANY($1::bigint[])
+             OR "comboId" IN (SELECT id FROM combos WHERE "parentComboId" = ANY($1::bigint[]))`,
+        [args.comboIds],
+      );
+      await del(
+        'combos (versiones hijas)',
+        `DELETE FROM combos WHERE "parentComboId" = ANY($1::bigint[])`,
+        [args.comboIds],
+      );
+      await del('combos', `DELETE FROM combos WHERE id = ANY($1::bigint[])`, [args.comboIds]);
     }
 
     if (args.productIds.length) {
