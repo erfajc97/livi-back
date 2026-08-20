@@ -29,11 +29,17 @@ export class CategoriesService {
   async createCategory(
     createCategoryDto: CreateCategoryDto,
     file?: Express.Multer.File,
+    mobileFile?: Express.Multer.File,
   ): Promise<Category> {
     if (file) {
       const uploaded = await this.s3Service.uploadFile(file, 'categories');
       createCategoryDto.imageUrl = uploaded.url;
       createCategoryDto.imageKey = uploaded.key;
+    }
+    if (mobileFile) {
+      const uploaded = await this.s3Service.uploadFile(mobileFile, 'categories');
+      createCategoryDto.mobileImageUrl = uploaded.url;
+      createCategoryDto.mobileImageKey = uploaded.key;
     }
     const category = this.categoriesRepository.create(createCategoryDto);
     return this.categoriesRepository.save(category);
@@ -84,6 +90,7 @@ export class CategoriesService {
     id: number,
     updateCategoryDto: UpdateCategoryDto,
     file?: Express.Multer.File,
+    mobileFile?: Express.Multer.File,
   ): Promise<Category> {
     const category = await this.categoriesRepository.findOne({ where: { id } });
 
@@ -98,6 +105,15 @@ export class CategoriesService {
       const uploaded = await this.s3Service.uploadFile(file, 'categories');
       updateCategoryDto.imageUrl = uploaded.url;
       updateCategoryDto.imageKey = uploaded.key;
+    }
+
+    if (mobileFile) {
+      if (category.mobileImageKey) {
+        await this.s3Service.deleteFile(category.mobileImageKey);
+      }
+      const uploaded = await this.s3Service.uploadFile(mobileFile, 'categories');
+      updateCategoryDto.mobileImageUrl = uploaded.url;
+      updateCategoryDto.mobileImageKey = uploaded.key;
     }
 
     Object.assign(category, updateCategoryDto);
@@ -121,6 +137,7 @@ export class CategoriesService {
   async createMarca(
     createMarcaDto: CreateMarcaDto,
     file?: Express.Multer.File,
+    mobileFile?: Express.Multer.File,
   ): Promise<Marca> {
     const category = await this.categoriesRepository.findOne({
       where: { id: createMarcaDto.categoryId },
@@ -136,6 +153,12 @@ export class CategoriesService {
       const uploaded = await this.s3Service.uploadFile(file, 'marcas');
       createMarcaDto.imageUrl = uploaded.url;
       createMarcaDto.imageKey = uploaded.key;
+    }
+
+    if (mobileFile) {
+      const uploaded = await this.s3Service.uploadFile(mobileFile, 'marcas');
+      createMarcaDto.mobileImageUrl = uploaded.url;
+      createMarcaDto.mobileImageKey = uploaded.key;
     }
 
     const marca = this.marcasRepository.create(createMarcaDto);
@@ -248,6 +271,7 @@ export class CategoriesService {
     id: number,
     updateMarcaDto: UpdateMarcaDto,
     file?: Express.Multer.File,
+    mobileFile?: Express.Multer.File,
   ): Promise<Marca> {
     const marca = await this.marcasRepository.findOne({ where: { id } });
 
@@ -274,6 +298,15 @@ export class CategoriesService {
       const uploaded = await this.s3Service.uploadFile(file, 'marcas');
       updateMarcaDto.imageUrl = uploaded.url;
       updateMarcaDto.imageKey = uploaded.key;
+    }
+
+    if (mobileFile) {
+      if (marca.mobileImageKey) {
+        await this.s3Service.deleteFile(marca.mobileImageKey);
+      }
+      const uploaded = await this.s3Service.uploadFile(mobileFile, 'marcas');
+      updateMarcaDto.mobileImageUrl = uploaded.url;
+      updateMarcaDto.mobileImageKey = uploaded.key;
     }
 
     Object.assign(marca, updateMarcaDto);

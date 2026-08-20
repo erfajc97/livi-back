@@ -43,4 +43,12 @@ export class CreateMarcaDto {
   @IsString()
   @IsOptional()
   imageKey?: string;
+
+  @IsString()
+  @IsOptional()
+  mobileImageUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  mobileImageKey?: string;
 }

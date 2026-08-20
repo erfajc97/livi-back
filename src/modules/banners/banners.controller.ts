@@ -9,9 +9,9 @@ import {
   Query,
   UseGuards,
   UseInterceptors,
-  UploadedFile,
+  UploadedFiles,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { BannersService } from './banners.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
@@ -24,6 +24,20 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/constants/roles.enum';
 
+/**
+ * Dos artes por banner: `image` (escritorio) y `mobileImage` (vertical). Ambos
+ * opcionales, así una edición que solo cambia el texto no obliga a re-subir.
+ */
+const BANNER_IMAGE_FIELDS = FileFieldsInterceptor([
+  { name: 'image', maxCount: 1 },
+  { name: 'mobileImage', maxCount: 1 },
+]);
+
+interface BannerUploadedFiles {
+  image?: Express.Multer.File[];
+  mobileImage?: Express.Multer.File[];
+}
+
 @ApiTags('banners')
 @Controller('banners')
 export class BannersController {
@@ -33,15 +47,24 @@ export class BannersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(BANNER_IMAGE_FIELDS)
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Create banner', description: 'Create a new banner with optional image upload' })
+  @ApiOperation({
+    summary: 'Create banner',
+    description:
+      'Create a new banner. `image` es el arte de escritorio y `mobileImage` el vertical ' +
+      'para teléfono; si falta el móvil, el front reutiliza el de escritorio.',
+  })
   @ApiResponse({ status: 201, description: 'Banner created successfully' })
   create(
     @Body() createBannerDto: CreateBannerDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: BannerUploadedFiles,
   ) {
-    return this.bannersService.create(createBannerDto, file);
+    return this.bannersService.create(
+      createBannerDto,
+      files?.image?.[0],
+      files?.mobileImage?.[0],
+    );
   }
 
   @Get()
@@ -113,7 +136,7 @@ export class BannersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(BANNER_IMAGE_FIELDS)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Update banner' })
   @ApiParam({ name: 'id', type: 'number' })
@@ -121,9 +144,14 @@ export class BannersController {
   update(
     @Param('id') id: string,
     @Body() updateBannerDto: UpdateBannerDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: BannerUploadedFiles,
   ) {
-    return this.bannersService.update(+id, updateBannerDto, file);
+    return this.bannersService.update(
+      +id,
+      updateBannerDto,
+      files?.image?.[0],
+      files?.mobileImage?.[0],
+    );
   }
 
   @Delete(':id')

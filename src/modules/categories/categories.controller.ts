@@ -9,9 +9,9 @@ import {
   Query,
   UseGuards,
   UseInterceptors,
-  UploadedFile,
+  UploadedFiles,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CoerceBoolInterceptor } from '../../common/interceptors/coerce-bool.interceptor';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
@@ -29,6 +29,20 @@ import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { CategoryQueryDto } from './dto/category-query.dto';
 import { ProductResponseDto } from '../products/dto/product-response.dto';
 
+/**
+ * Dos artes por categoría/marca: `image` (escritorio) y `mobileImage`
+ * (vertical). Ambos opcionales: editar solo el nombre no obliga a re-subir.
+ */
+const IMAGE_FIELDS = FileFieldsInterceptor([
+  { name: 'image', maxCount: 1 },
+  { name: 'mobileImage', maxCount: 1 },
+]);
+
+interface UploadedImages {
+  image?: Express.Multer.File[];
+  mobileImage?: Express.Multer.File[];
+}
+
 @ApiTags('categories')
 @Controller('categories')
 export class CategoriesController {
@@ -39,13 +53,17 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
+  @UseInterceptors(IMAGE_FIELDS, CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   createCategory(
     @Body() createCategoryDto: CreateCategoryDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: UploadedImages,
   ) {
-    return this.categoriesService.createCategory(createCategoryDto, file);
+    return this.categoriesService.createCategory(
+      createCategoryDto,
+      files?.image?.[0],
+      files?.mobileImage?.[0],
+    );
   }
 
   @Get()
@@ -99,14 +117,19 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
+  @UseInterceptors(IMAGE_FIELDS, CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   updateCategory(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: UploadedImages,
   ) {
-    return this.categoriesService.updateCategory(+id, updateCategoryDto, file);
+    return this.categoriesService.updateCategory(
+      +id,
+      updateCategoryDto,
+      files?.image?.[0],
+      files?.mobileImage?.[0],
+    );
   }
 
   @Delete(':id')
@@ -122,13 +145,17 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
+  @UseInterceptors(IMAGE_FIELDS, CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   createMarca(
     @Body() createMarcaDto: CreateMarcaDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: UploadedImages,
   ) {
-    return this.categoriesService.createMarca(createMarcaDto, file);
+    return this.categoriesService.createMarca(
+      createMarcaDto,
+      files?.image?.[0],
+      files?.mobileImage?.[0],
+    );
   }
 
   @Get('marcas/all')
@@ -189,14 +216,19 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth('JWT-auth')
   @Roles(Role.ADMIN)
-  @UseInterceptors(FileInterceptor('image'), CoerceBoolInterceptor)
+  @UseInterceptors(IMAGE_FIELDS, CoerceBoolInterceptor)
   @ApiConsumes('multipart/form-data')
   updateMarca(
     @Param('id') id: string,
     @Body() updateMarcaDto: UpdateMarcaDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: UploadedImages,
   ) {
-    return this.categoriesService.updateMarca(+id, updateMarcaDto, file);
+    return this.categoriesService.updateMarca(
+      +id,
+      updateMarcaDto,
+      files?.image?.[0],
+      files?.mobileImage?.[0],
+    );
   }
 
   @Delete('marcas/:id')

@@ -29,6 +29,14 @@ export class CreateCategoryDto {
   @IsOptional()
   imageKey?: string;
 
+  @IsString()
+  @IsOptional()
+  mobileImageUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  mobileImageKey?: string;
+
   @Transform(toBool)
   @IsBoolean()
   @IsOptional()

@@ -25,6 +25,16 @@ export class CreateBannerDto {
   @IsOptional()
   imageKey?: string;
 
+  @ApiPropertyOptional({ description: 'Mobile banner image URL (arte vertical)' })
+  @IsString()
+  @IsOptional()
+  mobileImageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'S3 key of the mobile image, for deletion' })
+  @IsString()
+  @IsOptional()
+  mobileImageKey?: string;
+
   @ApiPropertyOptional({ example: '/catalogo', description: 'Link or action URL' })
   @IsString()
   @IsOptional()

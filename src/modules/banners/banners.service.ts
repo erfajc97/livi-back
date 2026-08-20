@@ -17,11 +17,17 @@ export class BannersService {
   async create(
     createBannerDto: CreateBannerDto,
     file?: Express.Multer.File,
+    mobileFile?: Express.Multer.File,
   ): Promise<Banner> {
     if (file) {
       const uploaded = await this.s3Service.uploadFile(file, 'banners');
       createBannerDto.imageUrl = uploaded.url;
       createBannerDto.imageKey = uploaded.key;
+    }
+    if (mobileFile) {
+      const uploaded = await this.s3Service.uploadFile(mobileFile, 'banners');
+      createBannerDto.mobileImageUrl = uploaded.url;
+      createBannerDto.mobileImageKey = uploaded.key;
     }
     // La columna `title` es NOT NULL: sin texto se guarda vacío (el front
     // simplemente no renderiza el titular).
@@ -81,6 +87,7 @@ export class BannersService {
     id: number,
     updateBannerDto: UpdateBannerDto,
     file?: Express.Multer.File,
+    mobileFile?: Express.Multer.File,
   ): Promise<Banner> {
     const banner = await this.findOne(id);
 
@@ -93,6 +100,15 @@ export class BannersService {
       updateBannerDto.imageKey = uploaded.key;
     }
 
+    if (mobileFile) {
+      if (banner.mobileImageKey) {
+        await this.s3Service.deleteFile(banner.mobileImageKey);
+      }
+      const uploaded = await this.s3Service.uploadFile(mobileFile, 'banners');
+      updateBannerDto.mobileImageUrl = uploaded.url;
+      updateBannerDto.mobileImageKey = uploaded.key;
+    }
+
     Object.assign(banner, updateBannerDto);
     return this.bannersRepository.save(banner);
   }
@@ -101,6 +117,9 @@ export class BannersService {
     const banner = await this.findOne(id);
     if (banner.imageKey) {
       await this.s3Service.deleteFile(banner.imageKey);
+    }
+    if (banner.mobileImageKey) {
+      await this.s3Service.deleteFile(banner.mobileImageKey);
     }
     await this.bannersRepository.remove(banner);
   }

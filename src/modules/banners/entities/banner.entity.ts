@@ -36,6 +36,14 @@ export class Banner {
   @Column({ nullable: true })
   imageKey: string;
 
+  // Arte vertical opcional para móvil: si está vacío, el front usa la de
+  // escritorio.
+  @Column({ nullable: true })
+  mobileImageUrl: string;
+
+  @Column({ nullable: true })
+  mobileImageKey: string;
+
   @Column({ nullable: true })
   link: string;
 
