@@ -972,6 +972,37 @@ export class OrdersService {
   }
 
   /**
+   * Borra TODAS las órdenes (admin). Pensado para dejar la tienda en cero
+   * después de las pruebas, no para uso rutinario.
+   *
+   * Se lleva los ítems, el historial de estados y las transacciones que las
+   * órdenes generaron solas (COGS y comisión Payphone). NO toca productos,
+   * usuarios ni stock: el stock que esas órdenes descontaron sigue descontado
+   * y hay que ajustarlo a mano desde inventario.
+   */
+  async resetAll(): Promise<{
+    ordersDeleted: number;
+    itemsDeleted: number;
+    transactionsDeleted: number;
+  }> {
+    return this.ordersRepository.manager.transaction(async (manager) => {
+      const rows = async (sql: string): Promise<number> => {
+        const res = await manager.query(sql);
+        return Array.isArray(res) && typeof res[1] === 'number' ? res[1] : 0;
+      };
+
+      const transactionsDeleted = await rows(
+        `DELETE FROM transactions WHERE "referenceType" LIKE 'order_%'`,
+      );
+      await rows('DELETE FROM order_status_history');
+      const itemsDeleted = await rows('DELETE FROM order_items');
+      const ordersDeleted = await rows('DELETE FROM orders');
+
+      return { ordersDeleted, itemsDeleted, transactionsDeleted };
+    });
+  }
+
+  /**
    * Create a manual order (admin only).
    *
    * El canal de venta manual es "clientes que llegan por redes": lo normal es

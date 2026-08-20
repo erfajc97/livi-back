@@ -337,13 +337,49 @@ export class UsersService {
     return new UserResponseDto(updatedUser);
   }
 
-  async remove(id: number): Promise<void> {
+  /**
+   * Borra un usuario aunque tenga historial.
+   *
+   * Las órdenes NO se borran: se desvinculan (userId → NULL) y quedan como
+   * compra de invitado, con el nombre, correo y teléfono que ya guardan. Así
+   * el admin puede sacar de la base a un cliente de prueba sin perder la venta
+   * ni chocar contra la foreign key.
+   *
+   * Lo que sí se borra es lo que solo le sirve a ese usuario: su carrito, sus
+   * direcciones y sus usos de cupón.
+   */
+  async remove(id: number): Promise<{ ordersUnlinked: number }> {
     const user = await this.usersRepository.findOne({ where: { id } });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    await this.usersRepository.remove(user);
+    if (user.role === Role.ADMIN) {
+      const admins = await this.usersRepository.count({ where: { role: Role.ADMIN } });
+      if (admins <= 1) {
+        throw new ConflictException(
+          'No se puede eliminar el único administrador: quedarías sin acceso al panel.',
+        );
+      }
+    }
+
+    return this.usersRepository.manager.transaction(async (manager) => {
+      const unlink = await manager.query('UPDATE orders SET "userId" = NULL WHERE "userId" = $1', [
+        id,
+      ]);
+      const ordersUnlinked = Array.isArray(unlink) && typeof unlink[1] === 'number' ? unlink[1] : 0;
+
+      await manager.query(
+        'DELETE FROM cart_items WHERE "cartId" IN (SELECT id FROM carts WHERE "userId" = $1)',
+        [id],
+      );
+      await manager.query('DELETE FROM carts WHERE "userId" = $1', [id]);
+      await manager.query('DELETE FROM user_addresses WHERE "userId" = $1', [id]);
+      await manager.query('DELETE FROM coupon_usages WHERE "userId" = $1', [id]);
+      await manager.query('DELETE FROM users WHERE id = $1', [id]);
+
+      return { ordersUnlinked };
+    });
   }
 }

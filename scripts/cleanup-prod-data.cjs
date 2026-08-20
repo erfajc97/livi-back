@@ -34,6 +34,7 @@ const args = {
   wipeOrderFinance: raw.includes('--wipe-order-finance'),
   keepOrders: raw.includes('--keep-orders'),
   find: val('find'),
+  backupJson: val('backup-json'),
 };
 
 const client = new Client({
@@ -228,6 +229,48 @@ async function main() {
     console.log('\nDRY-RUN terminado. Nada fue borrado. Repite con --apply para ejecutar.');
     await client.end();
     return;
+  }
+
+  // ------------------------------------------------------- respaldo en JSON
+  // Red de seguridad cuando no hay pg_dump a mano: guarda las filas que van a
+  // desaparecer, para poder reconstruirlas si se borró de más.
+  if (args.backupJson) {
+    const dump = {
+      generadoEn: new Date().toISOString(),
+      db: `${process.env.DB_NAME}@${process.env.DB_HOST}`,
+      usuarios: doomedUserIds.length
+        ? await q(`SELECT * FROM users WHERE id = ANY($1::bigint[])`, [doomedUserIds])
+        : [],
+      ordenes: doomedOrderIds.length
+        ? await q(`SELECT * FROM orders WHERE id = ANY($1::bigint[])`, [doomedOrderIds])
+        : [],
+      orderItems: doomedOrderIds.length
+        ? await q(`SELECT * FROM order_items WHERE "orderId" = ANY($1::bigint[])`, [doomedOrderIds])
+        : [],
+      orderStatusHistory: doomedOrderIds.length
+        ? await q(`SELECT * FROM order_status_history WHERE "orderId" = ANY($1::bigint[])`, [
+            doomedOrderIds,
+          ])
+        : [],
+      productos: args.productIds.length
+        ? await q(`SELECT * FROM products WHERE id = ANY($1::bigint[])`, [args.productIds])
+        : [],
+      combos: args.comboIds.length
+        ? await q(`SELECT * FROM combos WHERE id = ANY($1::bigint[])`, [args.comboIds])
+        : [],
+      comboProducts: args.comboIds.length
+        ? await q(`SELECT * FROM combo_products WHERE "comboId" = ANY($1::bigint[])`, [args.comboIds])
+        : [],
+    };
+    require('fs').writeFileSync(args.backupJson, JSON.stringify(dump, null, 2), 'utf8');
+    const bytes = require('fs').statSync(args.backupJson).size;
+    console.log(
+      `\n>> Respaldo JSON: ${args.backupJson} (${Math.round(bytes / 1024)} KB) — ` +
+        `${dump.usuarios.length} usuarios, ${dump.ordenes.length} órdenes, ${dump.orderItems.length} items`,
+    );
+    if (bytes < 512) {
+      throw new Error('El respaldo salió vacío. Abortado, no se borró nada.');
+    }
   }
 
   // -------------------------------------------------------------- ejecución

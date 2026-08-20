@@ -126,8 +126,16 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'Product deleted successfully' })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 409, description: 'Cannot delete product with existing decants' })
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(+id);
+  @ApiQuery({
+    name: 'force',
+    required: false,
+    type: Boolean,
+    description:
+      'Borra el producto aunque tenga pedidos. Los ítems del pedido se desvinculan ' +
+      '(conservan precio y cantidad), no se borran.',
+  })
+  remove(@Param('id') id: string, @Query('force') force?: string) {
+    return this.productsService.remove(+id, force === 'true');
   }
 
   // ── Inventory / Stock Management ──────────────────────

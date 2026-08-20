@@ -483,11 +483,17 @@ export class ProductsService {
    * carritos, combos y pedidos apuntan al producto sin cascada: al borrarlo a
    * secas Postgres rechazaba la operación y salía un 500 sin explicación.
    *
-   * Un producto vendido no se borra nunca —rompería el histórico de pedidos—;
-   * en ese caso se responde 409 y el admin lo desactiva. Si solo está en
-   * carritos o combos, esas referencias se limpian y el producto se va.
+   * Un producto vendido no se borra por defecto —rompería el histórico de
+   * pedidos—; en ese caso se responde 409 y el admin decide: lo desactiva, o
+   * repite con `force` para borrarlo igual. Con `force` los ítems de pedido no
+   * se borran: se desvinculan (productId → NULL) y conservan su precio,
+   * cantidad y subtotal, así que el total del pedido sigue cuadrando aunque el
+   * nombre del producto ya no se pueda mostrar.
+   *
+   * Si solo está en carritos o combos, esas referencias se limpian siempre y
+   * el producto se va sin necesidad de `force`.
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: number, force = false): Promise<void> {
     const product = await this.productsRepository.findOne({
       where: { id },
       relations: ['variations'],
@@ -508,7 +514,7 @@ export class ProductsService {
     }
     const soldCount = await orderItemsQuery.getCount();
 
-    if (soldCount > 0) {
+    if (soldCount > 0 && !force) {
       throw new ConflictException(
         `No se puede eliminar "${product.name}": tiene ${soldCount} ` +
           `${soldCount === 1 ? 'pedido asociado' : 'pedidos asociados'} y se perdería el historial. ` +
@@ -517,6 +523,26 @@ export class ProductsService {
     }
 
     await this.dataSource.transaction(async (manager) => {
+      // Historial de pedidos: se desvincula, no se borra. El ítem conserva
+      // precio, cantidad y subtotal, así que el total del pedido no cambia.
+      if (soldCount > 0) {
+        await manager
+          .createQueryBuilder()
+          .update('order_items')
+          .set({ productId: null })
+          .where('productId = :id', { id })
+          .execute();
+
+        if (variationIds.length) {
+          await manager
+            .createQueryBuilder()
+            .update('order_items')
+            .set({ productVariationId: null })
+            .where('productVariationId IN (:...variationIds)', { variationIds })
+            .execute();
+        }
+      }
+
       // Carritos abiertos que lo tengan dentro
       await manager
         .createQueryBuilder()
@@ -532,6 +558,9 @@ export class ProductsService {
         .from('combo_products')
         .where('productId = :id', { id })
         .execute();
+
+      // Secciones del home que lo tengan seleccionado
+      await manager.query('DELETE FROM landing_section_products WHERE "productId" = $1', [id]);
 
       if (variationIds.length) {
         await manager

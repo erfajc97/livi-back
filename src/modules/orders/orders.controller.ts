@@ -7,12 +7,14 @@ import {
   Param,
   Delete,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateManualOrderDto } from './dto/create-manual-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { ResetOrdersDto } from './dto/reset-orders.dto';
 import { OrderResponseDto } from './dto/order-response.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -109,6 +111,23 @@ export class OrdersController {
   @ApiParam({ name: 'id', type: 'number' })
   getHistory(@Param('id') id: string) {
     return this.ordersService.getStatusHistory(+id);
+  }
+
+  @Post('reset')
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Reset all orders (admin)',
+    description:
+      'Borra TODAS las órdenes con sus ítems, historial y transacciones automáticas. ' +
+      'Requiere confirm: "RESET" en el body. No toca productos, usuarios ni stock.',
+  })
+  @ApiResponse({ status: 201, description: 'Órdenes borradas' })
+  @ApiResponse({ status: 400, description: 'Falta la confirmación' })
+  resetAll(@Body() dto: ResetOrdersDto) {
+    if (dto?.confirm !== 'RESET') {
+      throw new BadRequestException('Confirmación inválida: se espera confirm: "RESET".');
+    }
+    return this.ordersService.resetAll();
   }
 
   @Delete(':id')
