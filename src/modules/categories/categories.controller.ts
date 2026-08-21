@@ -43,6 +43,19 @@ interface UploadedImages {
   mobileImage?: Express.Multer.File[];
 }
 
+/**
+ * Devuelve el objeto de paginación solo si la request trae page o limit. Sin
+ * esto los DTO aplican sus valores por defecto y todos los listados salen
+ * cortados en 20 aunque nadie haya pedido paginar.
+ */
+function paginate(page?: string, limit?: string): PaginationDto | undefined {
+  if (page == null && limit == null) return undefined;
+  const dto = new PaginationDto();
+  if (page != null) dto.page = Number(page);
+  if (limit != null) dto.limit = Number(limit);
+  return dto;
+}
+
 @ApiTags('categories')
 @Controller('categories')
 export class CategoriesController {
@@ -76,10 +89,16 @@ export class CategoriesController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (for pagination)' })
   @ApiQuery({ name: 'bajoPedido', required: false, type: Boolean, description: 'Filter by bajo pedido status' })
   @ApiResponse({ status: 200, description: 'List of categories' })
-  findAllCategories(@Query() query: CategoryQueryDto) {
-    const { page, limit, bajoPedido: bajoPedidoRaw } = query;
+  findAllCategories(
+    @Query() query: CategoryQueryDto,
+    @Query('page') pageRaw?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const bajoPedidoRaw = query.bajoPedido;
     const bajoPedido = bajoPedidoRaw === 'true' ? true : bajoPedidoRaw === 'false' ? false : undefined;
-    return this.categoriesService.findAllCategories({ page, limit }, bajoPedido);
+    // Igual que en marcas: sin page/limit explícitos se devuelve la lista
+    // completa, no la primera página de 20.
+    return this.categoriesService.findAllCategories(paginate(pageRaw, limitRaw), bajoPedido);
   }
 
   @Get(':id')
@@ -176,9 +195,14 @@ export class CategoriesController {
   @ApiResponse({ status: 200, description: 'List of marcas' })
   findMarcasByCategory(
     @Param('categoryId') categoryId: string,
-    @Query() paginationDto: PaginationDto,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.categoriesService.findMarcasByCategory(+categoryId, paginationDto);
+    // PaginationDto trae page=1/limit=20 por defecto, así que recibirlo entero
+    // hacía que TODA llamada quedara paginada y el panel solo viera 20 marcas
+    // de las 26 que hay. Se pagina únicamente si el cliente lo pide.
+    const pagination = paginate(page, limit);
+    return this.categoriesService.findMarcasByCategory(+categoryId, pagination);
   }
 
   @Get('marcas/:id')

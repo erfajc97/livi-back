@@ -411,7 +411,14 @@ export class PaymentsService {
         shippingCity: dto.shippingCity,
         items: notificationItems,
       };
-      const notification = await this.orderNotificationService.notifyNewOrder(notificationData).catch(() => ({ whatsappUrl: '' }));
+      // Con PayPhone la orden se crea ANTES de que el cliente pase por la
+      // pasarela: abrirla no es pagarla, así que el aviso al admin se manda
+      // recién cuando el pago se aprueba (ver verifyAndConfirmPayment). Con
+      // efectivo o transferencia no hay pasarela y el admin sí necesita
+      // enterarse ya, para revisar el comprobante.
+      const notification = await this.orderNotificationService
+        .notifyNewOrder(notificationData, { sendAdminEmail: !isPayphone })
+        .catch(() => ({ whatsappUrl: '' }));
 
       // M-00 · Acuse al cliente. Con tarjeta el acuse se manda al aprobarse el
       // pago (M-01), pero con efectivo nadie le confirmaba nada: se quedaba sin
@@ -647,6 +654,32 @@ export class PaymentsService {
         .then((data) => this.emailService.sendOrderConfirmationEmail(data))
         .catch((err) =>
           console.error('[Payments] M-01 confirmación falló:', err?.message),
+        );
+
+      // M-13 · Aviso al admin, aquí y no al crear la orden: con tarjeta esta es
+      // la primera señal de que el dinero entró de verdad.
+      this.buildOrderEmailData(order)
+        .then((data) =>
+          this.orderNotificationService.notifyNewOrder({
+            orderNumber: data.orderNumber,
+            customerName: data.customerName ?? '',
+            customerEmail: data.customerEmail ?? '',
+            customerPhone: data.customerPhone ?? '',
+            total: Number(data.total ?? order.total),
+            paymentMethod: order.paymentMethod ?? 'PAYPHONE',
+            deliveryMethod: order.deliveryMethod ?? undefined,
+            shippingAddress: order.shippingAddress ?? undefined,
+            shippingCity: order.shippingCity ?? undefined,
+            items: (data.items ?? []).map((i) => ({
+              name: i.name,
+              quantity: i.quantity,
+              price: i.price,
+              ml: i.ml,
+            })),
+          }),
+        )
+        .catch((err) =>
+          console.error('[Payments] M-13 aviso al admin falló:', err?.message),
         );
     } else {
       order.paymentStatus = 'failed';

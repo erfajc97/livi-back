@@ -31,9 +31,21 @@ export class OrderNotificationService {
    * nondecants@gmail.com vía EmailService) + link de WhatsApp para el admin.
    * Los correos al cliente NO se envían aquí: siguen la matriz de mailing
    * (M-01 al aprobarse la tarjeta, M-02 al subir el comprobante, etc.).
+   *
+   * `sendAdminEmail: false` arma el link de WhatsApp pero se calla el correo.
+   * Sirve para PayPhone: la orden nace antes de que el cliente pase por la
+   * pasarela, y abrirla no es pagarla — el aviso al admin sale recién cuando
+   * el pago se aprueba.
    */
-  async notifyNewOrder(data: OrderNotificationData): Promise<{ whatsappUrl: string }> {
+  async notifyNewOrder(
+    data: OrderNotificationData,
+    options: { sendAdminEmail?: boolean } = {},
+  ): Promise<{ whatsappUrl: string }> {
     const whatsappUrl = this.buildWhatsappUrl(data);
+
+    if (options.sendAdminEmail === false) {
+      return { whatsappUrl };
+    }
 
     // M-13 en background (no bloquea la respuesta)
     this.emailService
