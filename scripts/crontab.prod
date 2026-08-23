@@ -1,0 +1,2 @@
+@reboot /usr/bin/sudo /usr/sbin/iptables -C DOCKER-USER -p tcp --dport 5432 -j DROP 2>/dev/null || /usr/bin/sudo /usr/sbin/iptables -I DOCKER-USER -p tcp --dport 5432 -j DROP
+0 7 * * * /home/ubuntu/api-ecommerce-nestjs/scripts/backup-db-daily.sh >> /home/ubuntu/backups/cron.log 2>&1
