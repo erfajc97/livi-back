@@ -21,6 +21,7 @@ import { LandingSectionsModule } from './modules/landing-sections/landing-sectio
 import { PaymentsModule } from './modules/payments/payments.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
+import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -54,6 +55,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     PaymentsModule,
     SettingsModule,
     NewsletterModule,
+    ...(process.env.SKIP_DB_CONNECTION !== 'true' ? [HealthModule] : []),
   ],
   providers: [
     {

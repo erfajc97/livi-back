@@ -22,6 +22,8 @@ services:
     environment:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      # POSTGRES_DB solo aplica la PRIMERA vez que se crea el volumen.
+      # Cambiar DB_NAME después no mueve los datos: el API miraría una base vacía.
       POSTGRES_DB: ${DB_NAME:-postgres}
     ports:
       - "${DB_PORT:-5432}:5432"

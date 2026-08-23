@@ -54,9 +54,9 @@ EXPOSE 4001
 ENV NODE_ENV=production
 ENV PORT=4001
 
-# Public GET /api/settings (JwtAuthGuard skips @Public routes). Honors PORT at runtime.
+# Public GET /api/health — falla si faltan products/categories/banners.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD ["node","-e","require('http').get('http://127.0.0.1:'+(process.env.PORT||4001)+'/api/settings',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+    CMD ["node","-e","require('http').get('http://127.0.0.1:'+(process.env.PORT||4001)+'/api/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 
 # Entrypoint runs migrations (via DB_MIGRATIONS_RUN env) + seeders, then starts app
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

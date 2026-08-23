@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from '@nestjs/typeorm';
 import { config } from 'dotenv';
 import { entities } from './entities';
+import { envFlag } from './env-flag';
 
 // Ensure .env is loaded (same as data-source.ts)
 config();
@@ -41,10 +42,10 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       database: this.configService.get<string>('DB_NAME', 'ecommerce'),
       entities, // Use centralized entities to avoid Node.js experimental TypeScript issues
       migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-      synchronize: this.configService.get<boolean>('DB_SYNCHRONIZE', false),
-      migrationsRun: this.configService.get<string>('DB_MIGRATIONS_RUN', 'false') === 'true',
-      logging: this.configService.get<boolean>('DB_LOGGING', false),
-      ssl: this.configService.get<boolean>('DB_SSL', false),
+      synchronize: envFlag(this.configService.get('DB_SYNCHRONIZE'), false),
+      migrationsRun: envFlag(this.configService.get('DB_MIGRATIONS_RUN'), false),
+      logging: envFlag(this.configService.get('DB_LOGGING'), false),
+      ssl: envFlag(this.configService.get('DB_SSL'), false),
     };
   }
 }
