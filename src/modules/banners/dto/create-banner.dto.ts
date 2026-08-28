@@ -45,7 +45,7 @@ export class CreateBannerDto {
   @IsOptional()
   buttonText?: string;
 
-  @ApiPropertyOptional({ enum: BannerType, example: BannerType.HERO, description: 'Banner type: hero, category, or marca (brand)' })
+  @ApiPropertyOptional({ enum: BannerType, example: BannerType.HERO, description: 'Banner type: hero, category, brand, navbar, catalog_perfumes, catalog_bajo_pedido' })
   @IsEnum(BannerType)
   @IsOptional()
   type?: BannerType;

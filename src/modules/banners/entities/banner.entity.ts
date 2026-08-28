@@ -16,6 +16,8 @@ export enum BannerType {
   CATEGORY = 'category',
   BRAND = 'brand',
   NAVBAR = 'navbar',
+  CATALOG_PERFUMES = 'catalog_perfumes',
+  CATALOG_BAJO_PEDIDO = 'catalog_bajo_pedido',
 }
 
 @Entity('banners')
