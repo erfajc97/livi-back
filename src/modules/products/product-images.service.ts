@@ -104,7 +104,7 @@ export class ProductImagesService {
   async findAll(productId: number): Promise<ProductImageResponseDto[]> {
     const images = await this.productImagesRepository.find({
       where: { productId },
-      order: { displayOrder: 'ASC' },
+      order: { displayOrder: 'ASC', id: 'ASC' },
     });
 
     return images.map((image) => new ProductImageResponseDto(image));

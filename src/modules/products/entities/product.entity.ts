@@ -164,7 +164,7 @@ export class Product {
   @OneToMany(() => ProductVariation, (variation) => variation.product)
   variations: ProductVariation[];
 
-  // Product images
+  // Product images. El orden de tienda se aplica al serializar (displayOrder).
   @OneToMany(() => ProductImage, (image) => image.product)
   images: ProductImage[];
 

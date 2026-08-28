@@ -15,6 +15,7 @@ import { Marca } from '../categories/entities/marca.entity';
 import { CreateProductDto, CreateProductVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
+import { orderedGallery } from './dto/product-image-response.dto';
 import { FilterProductsDto } from './dto/filter-products.dto';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 
@@ -410,10 +411,8 @@ export class ProductsService {
           (product as any).maxFormatPrice = Math.max(...prices);
         }
         (product as any).formats = vs.map((v) => {
-          // Primera imagen activa de la variante (por displayOrder).
-          const images = (v.images ?? [])
-            .filter((img: any) => img?.isActive !== false && img?.url)
-            .sort((a: any, b: any) => Number(a.displayOrder ?? 0) - Number(b.displayOrder ?? 0));
+          // Primera foto de la variante, ya ordenada por displayOrder.
+          const images = orderedGallery(v.images as any);
           return {
             id: v.id,
             ml: Number(v.mlSize),

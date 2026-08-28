@@ -66,8 +66,9 @@ export class LandingSectionsController {
   @ApiParam({ name: 'id', type: 'number', description: 'Section ID' })
   @ApiResponse({ status: 200, description: 'Section found', type: LandingSectionResponseDto })
   @ApiResponse({ status: 404, description: 'Section not found' })
-  findOne(@Param('id') id: string) {
-    return this.landingSectionsService.findOne(+id);
+  async findOne(@Param('id') id: string) {
+    const section = await this.landingSectionsService.findOne(+id);
+    return new LandingSectionResponseDto(section);
   }
 
   @Patch(':id')

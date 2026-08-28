@@ -216,7 +216,7 @@ export class CategoriesService {
 
     const [products, total] = await this.productsRepository.findAndCount({
       where: { categoryId, isActive: true },
-      relations: ['category', 'marca'],
+      relations: ['category', 'marca', 'images'],
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -244,7 +244,7 @@ export class CategoriesService {
 
     const [products, total] = await this.productsRepository.findAndCount({
       where: { marcaId, isActive: true },
-      relations: ['category', 'marca'],
+      relations: ['category', 'marca', 'images'],
       order: { createdAt: 'DESC' },
       skip,
       take: limit,

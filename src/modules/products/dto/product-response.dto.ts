@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
 import { PresentationType } from '../entities/product-variation.entity';
 import { ProductVariationResponseDto } from './product-variation-response.dto';
-import { ProductImageResponseDto } from './product-image-response.dto';
+import { orderedGallery, ProductImageResponseDto } from './product-image-response.dto';
 import { ProductVideoResponseDto } from './product-video-response.dto';
 
 export class ProductResponseDto {
@@ -204,9 +204,7 @@ export class ProductResponseDto {
       product.formats ??
       (product.variations?.length
         ? product.variations.map((v: any) => {
-            const images = (v.images ?? [])
-              .filter((img: any) => img?.isActive !== false && img?.url)
-              .sort((a: any, b: any) => Number(a.displayOrder ?? 0) - Number(b.displayOrder ?? 0));
+            const images = orderedGallery(v.images);
             return {
               id: Number(v.id),
               ml: Number(v.mlSize),
@@ -228,8 +226,10 @@ export class ProductResponseDto {
       );
     }
 
-    if (product.images && product.images.length > 0) {
-      this.images = product.images.map((image: any) => new ProductImageResponseDto(image));
+    const gallery = orderedGallery(product.images);
+    if (gallery.length > 0) {
+      this.images = gallery.map((image: any) => new ProductImageResponseDto(image));
+      this.imageUrl = gallery[0].url ?? product.imageUrl;
     }
 
     if (product.videos && product.videos.length > 0) {

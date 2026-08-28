@@ -5,6 +5,7 @@ import { LandingSection, SectionPlacement } from './entities/landing-section.ent
 import { Product } from '../products/entities/product.entity';
 import { CreateLandingSectionDto } from './dto/create-landing-section.dto';
 import { UpdateLandingSectionDto } from './dto/update-landing-section.dto';
+import { LandingSectionResponseDto } from './dto/landing-section-response.dto';
 
 @Injectable()
 export class LandingSectionsService {
@@ -31,20 +32,22 @@ export class LandingSectionsService {
     return this.landingSectionsRepository.save(section);
   }
 
-  async findAll(): Promise<LandingSection[]> {
-    return this.landingSectionsRepository.find({
+  async findAll(): Promise<LandingSectionResponseDto[]> {
+    const sections = await this.landingSectionsRepository.find({
       relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations', 'products.variations.images'],
       order: { order: 'ASC' },
     });
+    return sections.map((section) => new LandingSectionResponseDto(section));
   }
 
   /** Secciones visibles, filtrables por ubicación (home / cart). */
-  async findActive(placement?: SectionPlacement): Promise<LandingSection[]> {
-    return this.landingSectionsRepository.find({
+  async findActive(placement?: SectionPlacement): Promise<LandingSectionResponseDto[]> {
+    const sections = await this.landingSectionsRepository.find({
       where: { isActive: true, ...(placement ? { placement } : {}) },
       relations: ['products', 'products.marca', 'products.category', 'products.images', 'products.variations', 'products.variations.images'],
       order: { order: 'ASC' },
     });
+    return sections.map((section) => new LandingSectionResponseDto(section));
   }
 
   async findOne(id: number): Promise<LandingSection> {

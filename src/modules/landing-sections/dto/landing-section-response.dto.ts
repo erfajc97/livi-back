@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ProductResponseDto } from '../../products/dto/product-response.dto';
-import { SectionPlacement } from '../entities/landing-section.entity';
+import { LandingSection, SectionPlacement } from '../entities/landing-section.entity';
 
 export class LandingSectionResponseDto {
   @ApiProperty({ example: 1 })
@@ -26,4 +26,17 @@ export class LandingSectionResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  constructor(section: LandingSection) {
+    this.id = Number(section.id);
+    this.title = section.title;
+    this.order = section.order;
+    this.placement = section.placement;
+    this.isActive = section.isActive;
+    this.createdAt = section.createdAt;
+    this.updatedAt = section.updatedAt;
+    this.products = (section.products ?? []).map(
+      (product) => new ProductResponseDto(product, false),
+    );
+  }
 }

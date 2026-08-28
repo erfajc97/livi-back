@@ -78,7 +78,7 @@ export class ProductVariationImagesService {
   async findAll(variationId: number): Promise<ProductImageResponseDto[]> {
     const images = await this.variationImagesRepository.find({
       where: { variationId },
-      order: { displayOrder: 'ASC' },
+      order: { displayOrder: 'ASC', id: 'ASC' },
     });
 
     return images.map((image) => new ProductImageResponseDto(image));

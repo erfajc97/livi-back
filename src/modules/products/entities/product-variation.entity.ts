@@ -83,7 +83,7 @@ export class ProductVariation {
   @Column({ default: true })
   isActive: boolean;
 
-  // Variation images
+  // Variation images. El orden de tienda se aplica al serializar (displayOrder).
   @OneToMany(() => ProductVariationImage, (image) => image.variation)
   images: ProductVariationImage[];
 

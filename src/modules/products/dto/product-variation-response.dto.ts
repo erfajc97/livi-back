@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ProductImageResponseDto } from './product-image-response.dto';
+import { orderedGallery, ProductImageResponseDto } from './product-image-response.dto';
 import { ProductVideoResponseDto } from './product-video-response.dto';
 import { PresentationType } from '../entities/product-variation.entity';
 
@@ -109,8 +109,9 @@ export class ProductVariationResponseDto {
       this.optionValues = [];
     }
 
-    if (variation.images && variation.images.length > 0) {
-      this.images = variation.images.map((image: any) => new ProductImageResponseDto(image));
+    const gallery = orderedGallery(variation.images);
+    if (gallery.length > 0) {
+      this.images = gallery.map((image: any) => new ProductImageResponseDto(image));
     }
 
     if (variation.videos && variation.videos.length > 0) {
