@@ -28,10 +28,13 @@ import { Role } from '../../common/constants/roles.enum';
  * Dos artes por banner: `image` (escritorio) y `mobileImage` (vertical). Ambos
  * opcionales, así una edición que solo cambia el texto no obliga a re-subir.
  */
-const BANNER_IMAGE_FIELDS = FileFieldsInterceptor([
-  { name: 'image', maxCount: 1 },
-  { name: 'mobileImage', maxCount: 1 },
-]);
+const BANNER_IMAGE_FIELDS = FileFieldsInterceptor(
+  [
+    { name: 'image', maxCount: 1 },
+    { name: 'mobileImage', maxCount: 1 },
+  ],
+  { limits: { fileSize: 5 * 1024 * 1024 } },
+);
 
 interface BannerUploadedFiles {
   image?: Express.Multer.File[];

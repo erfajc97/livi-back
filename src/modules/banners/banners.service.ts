@@ -1,10 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Banner, BannerType } from './entities/banner.entity';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
 import { S3Service } from '../../common/services/s3.service';
+
+const BANNER_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+];
+
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+/** ChatGPT y algunos SO mandan image/webp como octet-stream. */
+function withImageMime(file: Express.Multer.File): Express.Multer.File {
+  if (BANNER_IMAGE_TYPES.includes(file.mimetype)) return file;
+  const ext = file.originalname.split('.').pop()?.toLowerCase() ?? '';
+  const mime = EXT_TO_MIME[ext];
+  if (mime) file.mimetype = mime;
+  return file;
+}
 
 @Injectable()
 export class BannersService {
@@ -20,12 +43,20 @@ export class BannersService {
     mobileFile?: Express.Multer.File,
   ): Promise<Banner> {
     if (file) {
-      const uploaded = await this.s3Service.uploadFile(file, 'banners');
+      const uploaded = await this.s3Service.uploadFile(
+        withImageMime(file),
+        'banners',
+        BANNER_IMAGE_TYPES,
+      );
       createBannerDto.imageUrl = uploaded.url;
       createBannerDto.imageKey = uploaded.key;
     }
     if (mobileFile) {
-      const uploaded = await this.s3Service.uploadFile(mobileFile, 'banners');
+      const uploaded = await this.s3Service.uploadFile(
+        withImageMime(mobileFile),
+        'banners',
+        BANNER_IMAGE_TYPES,
+      );
       createBannerDto.mobileImageUrl = uploaded.url;
       createBannerDto.mobileImageKey = uploaded.key;
     }
@@ -35,7 +66,7 @@ export class BannersService {
       ...createBannerDto,
       title: createBannerDto.title ?? '',
     });
-    return this.bannersRepository.save(banner);
+    return this.saveBanner(banner);
   }
 
   async findAll(): Promise<Banner[]> {
@@ -95,7 +126,11 @@ export class BannersService {
       if (banner.imageKey) {
         await this.s3Service.deleteFile(banner.imageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(file, 'banners');
+      const uploaded = await this.s3Service.uploadFile(
+        withImageMime(file),
+        'banners',
+        BANNER_IMAGE_TYPES,
+      );
       updateBannerDto.imageUrl = uploaded.url;
       updateBannerDto.imageKey = uploaded.key;
     }
@@ -104,13 +139,17 @@ export class BannersService {
       if (banner.mobileImageKey) {
         await this.s3Service.deleteFile(banner.mobileImageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(mobileFile, 'banners');
+      const uploaded = await this.s3Service.uploadFile(
+        withImageMime(mobileFile),
+        'banners',
+        BANNER_IMAGE_TYPES,
+      );
       updateBannerDto.mobileImageUrl = uploaded.url;
       updateBannerDto.mobileImageKey = uploaded.key;
     }
 
     Object.assign(banner, updateBannerDto);
-    return this.bannersRepository.save(banner);
+    return this.saveBanner(banner);
   }
 
   async remove(id: number): Promise<void> {
@@ -137,5 +176,19 @@ export class BannersService {
 
   async countVisible(): Promise<number> {
     return this.bannersRepository.count({ where: { isVisible: true } });
+  }
+
+  private async saveBanner(banner: Banner): Promise<Banner> {
+    try {
+      return await this.bannersRepository.save(banner);
+    } catch (err) {
+      const detail = err instanceof QueryFailedError ? String(err.message) : '';
+      if (/invalid input value for enum/i.test(detail)) {
+        throw new BadRequestException(
+          'Este tipo de banner no está disponible todavía. Hay que aplicar las migraciones de la API.',
+        );
+      }
+      throw err;
+    }
   }
 }
