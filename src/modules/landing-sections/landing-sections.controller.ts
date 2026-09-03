@@ -15,6 +15,7 @@ import { LandingSectionsService } from './landing-sections.service';
 import { CreateLandingSectionDto } from './dto/create-landing-section.dto';
 import { UpdateLandingSectionDto } from './dto/update-landing-section.dto';
 import { LandingSectionResponseDto } from './dto/landing-section-response.dto';
+import { ReorderSectionProductsDto } from './dto/reorder-section-products.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -93,6 +94,17 @@ export class LandingSectionsController {
   @ApiResponse({ status: 200, description: 'Product added successfully', type: LandingSectionResponseDto })
   addProduct(@Param('id') id: string, @Param('productId') productId: string) {
     return this.landingSectionsService.addProduct(+id, +productId);
+  }
+
+  @Patch(':id/products/reorder')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Reorder products in section', description: 'Set display order of products in a landing section' })
+  @ApiParam({ name: 'id', type: 'number', description: 'Section ID' })
+  @ApiResponse({ status: 200, description: 'Products reordered', type: LandingSectionResponseDto })
+  reorderProducts(@Param('id') id: string, @Body() dto: ReorderSectionProductsDto) {
+    return this.landingSectionsService.reorderProducts(+id, dto.productIds);
   }
 
   @Delete(':id/products/:productId')

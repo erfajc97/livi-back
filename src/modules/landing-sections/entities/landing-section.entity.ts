@@ -32,6 +32,10 @@ export class LandingSection {
   @Column({ default: true })
   isActive: boolean;
 
+  /** Orden de los productos dentro de la sección (ids). El primero se destaca. */
+  @Column({ type: 'int', array: true, default: () => "'{}'" })
+  productOrder: number[];
+
   @ManyToMany(() => Product)
   @JoinTable({
     name: 'landing_section_products',
