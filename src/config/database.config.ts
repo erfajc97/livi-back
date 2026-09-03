@@ -43,7 +43,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       entities, // Use centralized entities to avoid Node.js experimental TypeScript issues
       migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
       synchronize: envFlag(this.configService.get('DB_SYNCHRONIZE'), false),
-      migrationsRun: envFlag(this.configService.get('DB_MIGRATIONS_RUN'), false),
+      migrationsRun: envFlag(this.configService.get('DB_MIGRATIONS_RUN'), true),
       logging: envFlag(this.configService.get('DB_LOGGING'), false),
       ssl: envFlag(this.configService.get('DB_SSL'), false),
     };
