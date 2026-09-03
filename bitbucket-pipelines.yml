@@ -62,11 +62,11 @@ pipelines:
                   echo "Rebuilding and restarting only the api (entrypoint runs seeders)..."
                   docker compose up -d --build --no-deps api
 
-                  echo "Checking api stayed up (compose up -d is green even if Nest crashea)..."
+                  echo "Checking api stayed up..."
                   sleep 25
-                  api_status=$(docker inspect -f {{.State.Status}} api-ecommerce)
-                  echo "api status=$api_status"
-                  if [ "$api_status" != "running" ]; then
+                  # No usar {{ }} ni comillas simples: el pipe ssh-run las rompe
+                  # y el check fallaba con el API ya arriba (logs de Nest OK).
+                  if ! docker compose ps --status running --services | grep -w api; then
                     echo "API no quedo running despues del deploy"
                     docker compose logs --tail=120 api
                     exit 1
