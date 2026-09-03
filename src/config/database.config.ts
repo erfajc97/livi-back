@@ -43,7 +43,10 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       entities, // Use centralized entities to avoid Node.js experimental TypeScript issues
       migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
       synchronize: envFlag(this.configService.get('DB_SYNCHRONIZE'), false),
-      migrationsRun: envFlag(this.configService.get('DB_MIGRATIONS_RUN'), true),
+      // NUNCA default true: staging/prod se armó con synchronize, no con el
+      // historial de migrations. Si TypeORM corre CreateUsersTable sobre una
+      // base que ya tiene `users`, el proceso muere al boot y todo da 500.
+      migrationsRun: envFlag(this.configService.get('DB_MIGRATIONS_RUN'), false),
       logging: envFlag(this.configService.get('DB_LOGGING'), false),
       ssl: envFlag(this.configService.get('DB_SSL'), false),
     };

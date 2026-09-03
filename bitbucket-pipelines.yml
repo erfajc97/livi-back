@@ -62,6 +62,16 @@ pipelines:
                   echo "Rebuilding and restarting only the api (entrypoint runs seeders)..."
                   docker compose up -d --build --no-deps api
 
+                  echo "Checking api stayed up (compose up -d is green even if Nest crashea)..."
+                  sleep 25
+                  api_status=$(docker inspect -f {{.State.Status}} api-ecommerce)
+                  echo "api status=$api_status"
+                  if [ "$api_status" != "running" ]; then
+                    echo "API no quedo running despues del deploy"
+                    docker compose logs --tail=120 api
+                    exit 1
+                  fi
+
                   echo "Pruning dangling layers and old build cache (keeps tagged images)..."
                   docker image prune -f || true
                   docker builder prune -f --filter until=168h || true

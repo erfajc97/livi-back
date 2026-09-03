@@ -8,7 +8,7 @@ if [ ! -f "$SEEDER_PATH" ]; then
   exit 1
 fi
 
-echo "DB_HOST=${DB_HOST:-unset} DB_NAME=${DB_NAME:-unset} DB_SYNCHRONIZE=${DB_SYNCHRONIZE:-unset}"
+echo "DB_HOST=${DB_HOST:-unset} DB_NAME=${DB_NAME:-unset} DB_SYNCHRONIZE=${DB_SYNCHRONIZE:-unset} DB_MIGRATIONS_RUN=${DB_MIGRATIONS_RUN:-unset}"
 echo "Running database seeders (idempotent)..."
 node "$SEEDER_PATH"
 
