@@ -4,14 +4,14 @@ import { Repository } from 'typeorm';
 import { BlogPost } from './entities/blog-post.entity';
 import { CreateBlogPostDto } from './dto/create-blog-post.dto';
 import { UpdateBlogPostDto } from './dto/update-blog-post.dto';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 
 @Injectable()
 export class BlogService {
   constructor(
     @InjectRepository(BlogPost)
     private blogRepository: Repository<BlogPost>,
-    private s3Service: S3Service,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   private generateSlug(title: string): string {
@@ -37,7 +37,7 @@ export class BlogService {
     }
 
     if (file) {
-      const uploaded = await this.s3Service.uploadFile(file, 'blog');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'blog');
       dto.imageUrl = uploaded.url;
       dto.imageKey = uploaded.key;
     }
@@ -87,9 +87,9 @@ export class BlogService {
 
     if (file) {
       if (post.imageKey) {
-        await this.s3Service.deleteFile(post.imageKey);
+        await this.cloudinaryService.deleteFile(post.imageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(file, 'blog');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'blog');
       dto.imageUrl = uploaded.url;
       dto.imageKey = uploaded.key;
     }
@@ -105,7 +105,7 @@ export class BlogService {
   async remove(id: number): Promise<void> {
     const post = await this.findOne(id);
     if (post.imageKey) {
-      await this.s3Service.deleteFile(post.imageKey);
+      await this.cloudinaryService.deleteFile(post.imageKey);
     }
     await this.blogRepository.remove(post);
   }

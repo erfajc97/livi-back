@@ -1,0 +1,99 @@
+# Render Blueprint — LIVI API (NestJS + TypeORM + PostgreSQL)
+# https://render.com/docs/blueprint-spec
+#
+# Uso: sube este repo a GitHub y en Render → New → Blueprint → selecciona el repo.
+# Las variables marcadas sync:false las pide Render en el dashboard al aplicar
+# el blueprint (secretos que no van en el repo).
+#
+# Dominio: cuando compren el dominio, agregar en Render → livi-api → Settings →
+# Custom Domain (ej. api.livi.ec) y actualizar FRONTEND_URL / CORS_ORIGINS.
+
+databases:
+  - name: livi-db
+    databaseName: livi
+    user: livi
+    plan: free # upgrade a starter cuando haya tráfico real (free expira a los 30 días)
+
+services:
+  - type: web
+    name: livi-api
+    runtime: node
+    plan: free # el plan free "duerme" tras inactividad; subir a starter en prod
+    buildCommand: npm install && npm run build
+    startCommand: node dist/main.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # ── Base de datos (Render PostgreSQL) ──
+      - key: DB_HOST
+        fromDatabase: { name: livi-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: livi-db, property: port }
+      - key: DB_USERNAME
+        fromDatabase: { name: livi-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: livi-db, property: password }
+      - key: DB_NAME
+        fromDatabase: { name: livi-db, property: database }
+      - key: DB_SSL
+        value: "true" # Postgres de Render exige SSL
+      - key: DB_SYNCHRONIZE
+        value: "true" # primera carga: crea el esquema. Luego pasar a false y usar migraciones
+      - key: DB_MIGRATIONS_RUN
+        value: "false"
+
+      # ── Auth ──
+      - key: JWT_SECRET
+        generateValue: true # Render genera un secreto seguro
+      - key: JWT_EXPIRES_IN
+        value: 7d
+
+      # ── URLs / CORS (actualizar con el dominio real cuando exista) ──
+      # TODO dominio: reemplazar por https://livi-web.onrender.com (o el dominio comprado)
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false # ej: https://livi-web.onrender.com,https://livi-admin.onrender.com
+
+      # ── Cloudinary (imágenes y videos) — https://cloudinary.com ──
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: livi
+
+      # ── Correo (Resend) ──
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL
+        sync: false # ej: noreply@livi.ec (requiere dominio verificado en Resend)
+      - key: MAIL_FROM_NAME
+        value: LIVI
+      - key: MAIL_LOGO_URL
+        sync: false # URL pública del logo en Cloudinary, ej: https://res.cloudinary.com/<cloud>/image/upload/livi/branding/logo-livi.png
+
+      # ── Pasarela de pago (PayPhone) ──
+      - key: PAYPHONE_TOKEN
+        sync: false
+      - key: PAYPHONE_STORE_ID
+        sync: false
+
+      # ── Contacto admin (correos de notificación de pedidos) ──
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_WHATSAPP
+        sync: false
+
+      # ── Google OAuth (opcional — login con Google) ──
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false # ej: https://livi-api.onrender.com/api/auth/google/callback

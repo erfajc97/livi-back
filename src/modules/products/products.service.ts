@@ -48,6 +48,8 @@ export class ProductsService {
   ): Promise<void> {
     const slug = (product.name || 'product')
       .toString()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '') // sin tildes/diacríticos en el SKU
       .replace(/\s+/g, '-')
       .toLowerCase()
       .slice(0, 40);
@@ -55,6 +57,11 @@ export class ProductsService {
       .filter((v) => v && v.name != null && v.price != null)
       .map((v, i) => {
         const name = String(v.name).trim();
+        const variantSlug = name
+          .normalize('NFD')
+          .replace(/[̀-ͯ]/g, '')
+          .toLowerCase()
+          .replace(/\s+/g, '-');
         return this.variationsRepository.create({
           productId: product.id,
           price: Number(v.price),
@@ -62,7 +69,7 @@ export class ProductsService {
           name,
           sku:
             v.sku?.trim() ||
-            `${slug}-${name.toLowerCase().replace(/\s+/g, '-')}-${product.id}${i > 0 ? `-${i}` : ''}`,
+            `${slug}-${variantSlug}${v.size ? `-${String(v.size).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, '-')}` : ''}-${product.id}${i > 0 ? `-${i}` : ''}`,
           colorHex: v.colorHex?.trim() || undefined,
           size: v.size?.trim() || undefined,
           isActive: v.isActive ?? true,

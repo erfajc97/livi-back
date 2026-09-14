@@ -16,7 +16,7 @@ import { ProductVariationVideosService } from './product-variation-videos.servic
 import { ProductVariationVideosController } from './product-variation-videos.controller';
 import { UploadsController } from './uploads.controller';
 import { StockService } from './stock.service';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { Product } from './entities/product.entity';
 import { ProductOption } from './entities/product-option.entity';
 import { ProductOptionValue } from './entities/product-option-value.entity';
@@ -58,7 +58,7 @@ import { ProductVariationVideo } from './entities/product-variation-video.entity
     ProductVariationImagesService,
     ProductVariationVideosService,
     StockService,
-    S3Service,
+    CloudinaryService,
   ],
   exports: [
     ProductsService,

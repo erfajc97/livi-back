@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { PayPhoneService } from './payphone.service';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { OrderNotificationService } from '../../common/services/order-notification.service';
 import { Order } from '../orders/entities/order.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
@@ -24,7 +24,7 @@ import { EmailModule } from '../email/email.module';
     EmailModule,
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService, PayPhoneService, S3Service, OrderNotificationService],
+  providers: [PaymentsService, PayPhoneService, CloudinaryService, OrderNotificationService],
   exports: [PaymentsService, PayPhoneService],
 })
 export class PaymentsModule {}

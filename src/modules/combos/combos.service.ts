@@ -6,7 +6,7 @@ import { ComboProduct } from './entities/combo-product.entity';
 import { Product } from '../products/entities/product.entity';
 import { CreateComboDto } from './dto/create-combo.dto';
 import { UpdateComboDto } from './dto/update-combo.dto';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 
 // Relaciones de los productos de un combo.
 const PRODUCT_RELATIONS = [
@@ -29,7 +29,7 @@ export class CombosService {
     private comboProductRepository: Repository<ComboProduct>,
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
-    private s3Service: S3Service,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   async create(dto: CreateComboDto, file?: Express.Multer.File): Promise<Combo> {
@@ -60,7 +60,7 @@ export class CombosService {
     let imageUrl = dto.imageUrl;
     let imageKey: string | undefined;
     if (file) {
-      const uploaded = await this.s3Service.uploadFile(file, 'combos');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'combos');
       imageUrl = uploaded.url;
       imageKey = uploaded.key;
     }
@@ -134,9 +134,9 @@ export class CombosService {
     // Handle image upload
     if (file) {
       if (combo.imageKey) {
-        await this.s3Service.deleteFile(combo.imageKey);
+        await this.cloudinaryService.deleteFile(combo.imageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(file, 'combos');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'combos');
       combo.imageUrl = uploaded.url;
       combo.imageKey = uploaded.key;
     }

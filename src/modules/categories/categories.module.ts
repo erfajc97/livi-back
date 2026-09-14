@@ -5,12 +5,12 @@ import { CategoriesController } from './categories.controller';
 import { Category } from './entities/category.entity';
 import { Marca } from './entities/marca.entity';
 import { Product } from '../products/entities/product.entity';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Category, Marca, Product])],
   controllers: [CategoriesController],
-  providers: [CategoriesService, S3Service],
+  providers: [CategoriesService, CloudinaryService],
   exports: [CategoriesService],
 })
 export class CategoriesModule {}

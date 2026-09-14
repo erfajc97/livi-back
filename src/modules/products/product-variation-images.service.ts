@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductVariationImage } from './entities/product-variation-image.entity';
 import { ProductVariation } from './entities/product-variation.entity';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { UpdateProductImageDto } from './dto/update-product-image.dto';
 import { ProductImageResponseDto } from './dto/product-image-response.dto';
 
@@ -22,7 +22,7 @@ export class ProductVariationImagesService {
     private variationImagesRepository: Repository<ProductVariationImage>,
     @InjectRepository(ProductVariation)
     private variationsRepository: Repository<ProductVariation>,
-    private s3Service: S3Service,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   /**
@@ -43,7 +43,7 @@ export class ProductVariationImagesService {
     }
 
     // Upload files to S3
-    const uploadResults = await this.s3Service.uploadFiles(
+    const uploadResults = await this.cloudinaryService.uploadFiles(
       files,
       `product-variations/${variationId}/images`,
       this.ALLOWED_IMAGE_TYPES,
@@ -120,7 +120,7 @@ export class ProductVariationImagesService {
     }
 
     // Delete from S3
-    await this.s3Service.deleteFile(image.key);
+    await this.cloudinaryService.deleteFile(image.key);
 
     // Delete from database
     await this.variationImagesRepository.remove(image);
@@ -140,7 +140,7 @@ export class ProductVariationImagesService {
 
     // Delete from S3
     const keys = images.map((image) => image.key);
-    await this.s3Service.deleteFiles(keys);
+    await this.cloudinaryService.deleteFiles(keys);
 
     // Delete from database
     await this.variationImagesRepository.remove(images);

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductVideo } from './entities/product-video.entity';
 import { Product } from './entities/product.entity';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { UpdateProductVideoDto } from './dto/update-product-video.dto';
 import { ProductVideoResponseDto } from './dto/product-video-response.dto';
 
@@ -21,7 +21,7 @@ export class ProductVideosService {
     private productVideosRepository: Repository<ProductVideo>,
     @InjectRepository(Product)
     private productsRepository: Repository<Product>,
-    private s3Service: S3Service,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   /**
@@ -42,7 +42,7 @@ export class ProductVideosService {
     }
 
     // Upload files to S3
-    const uploadResults = await this.s3Service.uploadFiles(
+    const uploadResults = await this.cloudinaryService.uploadFiles(
       files,
       `products/${productId}/videos`,
       this.ALLOWED_VIDEO_TYPES,
@@ -110,7 +110,7 @@ export class ProductVideosService {
     }
 
     // Delete from S3
-    await this.s3Service.deleteFile(video.key);
+    await this.cloudinaryService.deleteFile(video.key);
 
     // Delete from database
     await this.productVideosRepository.remove(video);
@@ -130,7 +130,7 @@ export class ProductVideosService {
 
     // Delete from S3
     const keys = videos.map((video) => video.key);
-    await this.s3Service.deleteFiles(keys);
+    await this.cloudinaryService.deleteFiles(keys);
 
     // Delete from database
     await this.productVideosRepository.remove(videos);

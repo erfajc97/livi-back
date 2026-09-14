@@ -13,7 +13,7 @@ import { User } from '../users/entities/user.entity';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { OrderResponseDto } from '../orders/dto/order-response.dto';
 import { PayPhoneService } from './payphone.service';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 import { StockService } from '../products/stock.service';
 import { OrderStatusHistory } from '../orders/entities/order-status-history.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -40,7 +40,7 @@ export class PaymentsService {
     private variationsRepository: Repository<ProductVariation>,
     private dataSource: DataSource,
     private payPhoneService: PayPhoneService,
-    private s3Service: S3Service,
+    private cloudinaryService: CloudinaryService,
     private stockService: StockService,
     private orderNotificationService: OrderNotificationService,
     private couponsService: CouponsService,
@@ -715,10 +715,10 @@ export class PaymentsService {
 
     // Delete old receipt if exists
     if (order.transferReceiptKey) {
-      await this.s3Service.deleteFile(order.transferReceiptKey).catch(() => {});
+      await this.cloudinaryService.deleteFile(order.transferReceiptKey).catch(() => {});
     }
 
-    const uploaded = await this.s3Service.uploadFile(file, 'receipts', [
+    const uploaded = await this.cloudinaryService.uploadFile(file, 'receipts', [
       'image/jpeg',
       'image/png',
       'image/webp',

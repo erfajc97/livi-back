@@ -11,7 +11,7 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 import { PaginatedResponseDto } from '../../common/dto/pagination.dto';
 import { Product } from '../products/entities/product.entity';
 import { ProductResponseDto } from '../products/dto/product-response.dto';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 
 @Injectable()
 export class CategoriesService {
@@ -22,7 +22,7 @@ export class CategoriesService {
     private marcasRepository: Repository<Marca>,
     @InjectRepository(Product)
     private productsRepository: Repository<Product>,
-    private s3Service: S3Service,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   // Category methods
@@ -32,12 +32,12 @@ export class CategoriesService {
     mobileFile?: Express.Multer.File,
   ): Promise<Category> {
     if (file) {
-      const uploaded = await this.s3Service.uploadFile(file, 'categories');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'categories');
       createCategoryDto.imageUrl = uploaded.url;
       createCategoryDto.imageKey = uploaded.key;
     }
     if (mobileFile) {
-      const uploaded = await this.s3Service.uploadFile(mobileFile, 'categories');
+      const uploaded = await this.cloudinaryService.uploadFile(mobileFile, 'categories');
       createCategoryDto.mobileImageUrl = uploaded.url;
       createCategoryDto.mobileImageKey = uploaded.key;
     }
@@ -97,18 +97,18 @@ export class CategoriesService {
 
     if (file) {
       if (category.imageKey) {
-        await this.s3Service.deleteFile(category.imageKey);
+        await this.cloudinaryService.deleteFile(category.imageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(file, 'categories');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'categories');
       updateCategoryDto.imageUrl = uploaded.url;
       updateCategoryDto.imageKey = uploaded.key;
     }
 
     if (mobileFile) {
       if (category.mobileImageKey) {
-        await this.s3Service.deleteFile(category.mobileImageKey);
+        await this.cloudinaryService.deleteFile(category.mobileImageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(mobileFile, 'categories');
+      const uploaded = await this.cloudinaryService.uploadFile(mobileFile, 'categories');
       updateCategoryDto.mobileImageUrl = uploaded.url;
       updateCategoryDto.mobileImageKey = uploaded.key;
     }
@@ -147,13 +147,13 @@ export class CategoriesService {
     }
 
     if (file) {
-      const uploaded = await this.s3Service.uploadFile(file, 'marcas');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'marcas');
       createMarcaDto.imageUrl = uploaded.url;
       createMarcaDto.imageKey = uploaded.key;
     }
 
     if (mobileFile) {
-      const uploaded = await this.s3Service.uploadFile(mobileFile, 'marcas');
+      const uploaded = await this.cloudinaryService.uploadFile(mobileFile, 'marcas');
       createMarcaDto.mobileImageUrl = uploaded.url;
       createMarcaDto.mobileImageKey = uploaded.key;
     }
@@ -290,18 +290,18 @@ export class CategoriesService {
 
     if (file) {
       if (marca.imageKey) {
-        await this.s3Service.deleteFile(marca.imageKey);
+        await this.cloudinaryService.deleteFile(marca.imageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(file, 'marcas');
+      const uploaded = await this.cloudinaryService.uploadFile(file, 'marcas');
       updateMarcaDto.imageUrl = uploaded.url;
       updateMarcaDto.imageKey = uploaded.key;
     }
 
     if (mobileFile) {
       if (marca.mobileImageKey) {
-        await this.s3Service.deleteFile(marca.mobileImageKey);
+        await this.cloudinaryService.deleteFile(marca.mobileImageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(mobileFile, 'marcas');
+      const uploaded = await this.cloudinaryService.uploadFile(mobileFile, 'marcas');
       updateMarcaDto.mobileImageUrl = uploaded.url;
       updateMarcaDto.mobileImageKey = uploaded.key;
     }

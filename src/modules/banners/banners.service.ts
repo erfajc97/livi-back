@@ -4,7 +4,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { Banner, BannerType } from './entities/banner.entity';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 
 const BANNER_IMAGE_TYPES = [
   'image/jpeg',
@@ -34,7 +34,7 @@ export class BannersService {
   constructor(
     @InjectRepository(Banner)
     private bannersRepository: Repository<Banner>,
-    private s3Service: S3Service,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   async create(
@@ -43,7 +43,7 @@ export class BannersService {
     mobileFile?: Express.Multer.File,
   ): Promise<Banner> {
     if (file) {
-      const uploaded = await this.s3Service.uploadFile(
+      const uploaded = await this.cloudinaryService.uploadFile(
         withImageMime(file),
         'banners',
         BANNER_IMAGE_TYPES,
@@ -52,7 +52,7 @@ export class BannersService {
       createBannerDto.imageKey = uploaded.key;
     }
     if (mobileFile) {
-      const uploaded = await this.s3Service.uploadFile(
+      const uploaded = await this.cloudinaryService.uploadFile(
         withImageMime(mobileFile),
         'banners',
         BANNER_IMAGE_TYPES,
@@ -124,9 +124,9 @@ export class BannersService {
 
     if (file) {
       if (banner.imageKey) {
-        await this.s3Service.deleteFile(banner.imageKey);
+        await this.cloudinaryService.deleteFile(banner.imageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(
+      const uploaded = await this.cloudinaryService.uploadFile(
         withImageMime(file),
         'banners',
         BANNER_IMAGE_TYPES,
@@ -137,9 +137,9 @@ export class BannersService {
 
     if (mobileFile) {
       if (banner.mobileImageKey) {
-        await this.s3Service.deleteFile(banner.mobileImageKey);
+        await this.cloudinaryService.deleteFile(banner.mobileImageKey);
       }
-      const uploaded = await this.s3Service.uploadFile(
+      const uploaded = await this.cloudinaryService.uploadFile(
         withImageMime(mobileFile),
         'banners',
         BANNER_IMAGE_TYPES,
@@ -155,10 +155,10 @@ export class BannersService {
   async remove(id: number): Promise<void> {
     const banner = await this.findOne(id);
     if (banner.imageKey) {
-      await this.s3Service.deleteFile(banner.imageKey);
+      await this.cloudinaryService.deleteFile(banner.imageKey);
     }
     if (banner.mobileImageKey) {
-      await this.s3Service.deleteFile(banner.mobileImageKey);
+      await this.cloudinaryService.deleteFile(banner.mobileImageKey);
     }
     await this.bannersRepository.remove(banner);
   }

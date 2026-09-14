@@ -5,12 +5,12 @@ import { CombosController } from './combos.controller';
 import { Combo } from './entities/combo.entity';
 import { ComboProduct } from './entities/combo-product.entity';
 import { Product } from '../products/entities/product.entity';
-import { S3Service } from '../../common/services/s3.service';
+import { CloudinaryService } from '../../common/services/cloudinary.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Combo, ComboProduct, Product])],
   controllers: [CombosController],
-  providers: [CombosService, S3Service],
+  providers: [CombosService, CloudinaryService],
   exports: [CombosService],
 })
 export class CombosModule {}
