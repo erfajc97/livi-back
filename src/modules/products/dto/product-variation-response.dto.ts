@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { orderedGallery, ProductImageResponseDto } from './product-image-response.dto';
 import { ProductVideoResponseDto } from './product-video-response.dto';
-import { PresentationType } from '../entities/product-variation.entity';
 
 export class ProductVariationResponseDto {
   @ApiProperty()
@@ -9,18 +8,6 @@ export class ProductVariationResponseDto {
 
   @ApiProperty()
   productId: number;
-
-  @ApiProperty({ description: 'Decant size in ml or full bottle ml' })
-  mlSize: number;
-
-  @ApiProperty({ description: 'Whether this is a full sealed bottle variation' })
-  isFullBottle: boolean;
-
-  @ApiProperty({
-    enum: PresentationType,
-    description: "Tipo de presentación: 'decant' | 'sellada' | 'original'",
-  })
-  presentationType: PresentationType;
 
   @ApiProperty({ required: false })
   price?: number;
@@ -33,6 +20,12 @@ export class ProductVariationResponseDto {
 
   @ApiProperty({ required: false })
   name?: string;
+
+  @ApiProperty({ required: false, description: 'Color del swatch en hexadecimal' })
+  colorHex?: string;
+
+  @ApiProperty({ required: false, description: 'Talla de la variante (combo color + talla)' })
+  size?: string;
 
   @ApiProperty()
   optionValues: Array<{
@@ -51,7 +44,7 @@ export class ProductVariationResponseDto {
   @ApiProperty({ type: [ProductVideoResponseDto], required: false })
   videos?: ProductVideoResponseDto[];
 
-  @ApiProperty({ description: 'Calculated available quantity for this variation' })
+  @ApiProperty({ description: 'Available units (product-level stock)' })
   availableQuantity: number;
 
   @ApiProperty()
@@ -63,34 +56,20 @@ export class ProductVariationResponseDto {
   @ApiProperty()
   updatedAt: Date;
 
-  constructor(variation: any, productStock?: number, productTotalMl?: number, productOpenMl?: number) {
+  constructor(variation: any, productStock?: number) {
     this.id = variation.id;
     this.productId = variation.productId;
-    this.mlSize = Number(variation.mlSize || 0);
-    this.isFullBottle = variation.isFullBottle ?? false;
-    // Fallback para registros antiguos o payloads parciales sin la columna.
-    this.presentationType =
-      variation.presentationType ??
-      (this.isFullBottle ? PresentationType.SELLADA : PresentationType.DECANT);
     this.price = variation.price;
     this.cost = variation.cost ?? undefined;
     this.sku = variation.sku;
     this.name = variation.name;
+    this.colorHex = variation.colorHex ?? undefined;
+    this.size = variation.size ?? undefined;
     this.isActive = variation.isActive;
 
-    // Calculate available quantity from product-level stock
-    const stock = productStock ?? 0;
-    const totalMl = productTotalMl ?? 100;
-    const openMl = productOpenMl ?? 0;
-    const mlSize = Number(variation.mlSize || 0);
-    if (variation.isFullBottle) {
-      this.availableQuantity = stock;
-    } else if (mlSize > 0) {
-      const totalAvailableMl = openMl + stock * totalMl;
-      this.availableQuantity = Math.floor(totalAvailableMl / mlSize);
-    } else {
-      this.availableQuantity = 0;
-    }
+    // El stock vive a nivel producto: las unidades disponibles de la
+    // variación son las unidades del producto.
+    this.availableQuantity = productStock ?? 0;
 
     this.createdAt = variation.createdAt;
     this.updatedAt = variation.updatedAt;

@@ -18,7 +18,4 @@ export class CategoryQueryDto {
   @Max(100)
   limit?: number = 20;
 
-  @ApiPropertyOptional({ description: 'Filter by bajo pedido status' })
-  @IsOptional()
-  bajoPedido?: string;
 }

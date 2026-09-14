@@ -59,25 +59,11 @@ export class OrderItem {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   subtotal: number;
 
-  // Total ml deducted from open bottle (for decant orders, used in cancellation restoration)
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  mlDeducted: number;
-
-  // Number of sealed bottles opened to fulfill this order item
-  @Column({ default: 0 })
-  bottlesOpened: number;
-
   // Marks when stock was deducted for this item — used to guarantee idempotency
   // when the same order's fulfillment is processed more than once (e.g.,
   // payment confirmation retry, manual reconciliation, status re-transition).
   @Column({ type: 'timestamp', nullable: true })
   stockDeductedAt: Date | null;
-
-  // Quantity that could not be fulfilled from existing stock and was tagged
-  // as bajo pedido (back-order) instead. Shown in order detail so operations
-  // know which units need to be sourced.
-  @Column({ type: 'int', default: 0 })
-  bajoPedidoQuantity: number;
 
   @CreateDateColumn()
   createdAt: Date;

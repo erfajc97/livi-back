@@ -83,22 +83,19 @@ export class CategoriesController {
   @Public()
   @ApiOperation({
     summary: 'Get all categories',
-    description: 'Retrieve all categories with optional pagination. Filter by bajoPedido to get pre-order categories.'
+    description: 'Retrieve all categories with optional pagination.'
   })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (for pagination)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (for pagination)' })
-  @ApiQuery({ name: 'bajoPedido', required: false, type: Boolean, description: 'Filter by bajo pedido status' })
   @ApiResponse({ status: 200, description: 'List of categories' })
   findAllCategories(
     @Query() query: CategoryQueryDto,
     @Query('page') pageRaw?: string,
     @Query('limit') limitRaw?: string,
   ) {
-    const bajoPedidoRaw = query.bajoPedido;
-    const bajoPedido = bajoPedidoRaw === 'true' ? true : bajoPedidoRaw === 'false' ? false : undefined;
     // Igual que en marcas: sin page/limit explícitos se devuelve la lista
     // completa, no la primera página de 20.
-    return this.categoriesService.findAllCategories(paginate(pageRaw, limitRaw), bajoPedido);
+    return this.categoriesService.findAllCategories(paginate(pageRaw, limitRaw));
   }
 
   @Get(':id')

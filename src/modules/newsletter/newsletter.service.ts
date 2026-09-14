@@ -32,7 +32,7 @@ export class NewsletterService {
       this.logger.warn('RESEND_API_KEY sin configurar: las campañas no se envían');
     }
     this.fromEmail =
-      this.configService.get<string>('MAIL_FROM_EMAIL') || 'noreply@nondecants.com';
+      this.configService.get<string>('MAIL_FROM_EMAIL') || 'noreply@livi.ec';
     this.fromName = this.configService.get<string>('MAIL_FROM_NAME') || 'NonDecants';
     // FRONTEND_URL puede traer varios orígenes (lista de CORS): para los
     // enlaces del correo vale el primero.

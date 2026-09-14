@@ -84,7 +84,7 @@ async function bootstrap() {
     next();
   });
 
-  // CORS: en producción se permiten los dominios propios (nondecants.com y
+  // CORS: en producción se permiten los dominios propios (livi.ec y
   // subdominios) más los orígenes de FRONTEND_URL + CORS_ORIGINS (separados
   // por coma); en desarrollo se permite cualquier origen.
   //
@@ -99,7 +99,7 @@ async function bootstrap() {
   ]
     .map((o) => o.trim().replace(/\/+$/, ''))
     .filter(Boolean);
-  const ownDomainRegex = /^https:\/\/([a-z0-9-]+\.)*nondecants\.com$/i;
+  const ownDomainRegex = /^https:\/\/([a-z0-9-]+\.)*livi\.ec$/i;
   app.enableCors({
     origin: isProd
       ? (origin, callback) => {

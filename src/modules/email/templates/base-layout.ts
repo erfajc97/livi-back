@@ -5,9 +5,11 @@ import {
   OrderEmailItem,
   paymentMethodLabel,
 } from '../email.types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
- * Layout base de marca para todos los correos transaccionales de NonDecants.
+ * Layout base de marca para todos los correos transaccionales de LIVI.
  *
  * Sigue la identidad Atelier de la tienda: fondo marfil, tinta carbón, dorado
  * como acento y titulares en serif. Antes los correos eran oscuros —de la etapa
@@ -18,28 +20,31 @@ import {
  * ancho fijo de 600 px y colores en hex de seis dígitos.
  *
  * Todo correo al cliente lleva pie con WhatsApp 0992305463 y
- * contacto@nondecants.com (regla de la matriz de mailing).
+ * contacto de LIVI (regla de la matriz de mailing).
  */
 
-export const BRAND_NAME = 'NonDecants';
+export const BRAND_NAME = 'LIVI';
 export const BRAND_WHATSAPP = '0992305463';
 export const BRAND_WHATSAPP_URL = 'https://wa.me/593992305463';
-export const BRAND_CONTACT_EMAIL = 'contacto@nondecants.com';
+export const BRAND_CONTACT_EMAIL = 'contacto@livi.ec';
 /** Sitio público: respaldo para el logo cuando FRONTEND_URL no sirve. */
-export const PUBLIC_SITE_URL = 'https://nondecants.com';
+export const PUBLIC_SITE_URL = 'https://livi.ec';
 /** El logo oficial vive en el `public/` del front. */
-export const BRAND_LOGO_PATH = '/logonondecants.png';
+export const BRAND_LOGO_PATH = '/logo-livi.png';
+/** CID del logo inline: viaja adjunto en cada correo (lo agrega EmailService),
+    así no depende de que el sitio público esté desplegado para verse. */
+export const BRAND_LOGO_CID = 'livi-logo';
 
-/** Paleta Atelier, la misma del sitio. */
+/** Paleta LIVI, la misma del sitio (blanco · burgundy · espresso). */
 const C = {
-  page: '#EFEAE3', // marfil del fondo
-  card: '#FFFDFA', // tarjeta, un punto más clara que el fondo
-  ink: '#1C1A17', // texto principal
-  soft: '#56504A', // párrafos
-  muted: '#8A8278', // rótulos y notas al pie
-  line: '#E5DED4', // hairlines
-  gold: '#CCB377', // acento
-  goldSoft: '#F3EBDB', // fondo de bloques destacados
+  page: '#F4F1EC', // marfil-gris del fondo
+  card: '#FFFFFF', // tarjeta blanca
+  ink: '#231815', // espresso — texto principal
+  soft: '#4A3F38', // párrafos
+  muted: '#7A6E64', // rótulos y notas al pie
+  line: '#E5E0D7', // hairlines
+  gold: '#4D0E12', // burgundy LIVI — acento (filetes, botones)
+  goldSoft: '#F6EEEC', // fondo de bloques destacados (burgundy muy lavado)
 };
 
 export function escapeHtml(value: string): string {
@@ -72,10 +77,10 @@ const FONT_IMPORT = `
   </style>`;
 
 /**
- * URL absoluta del logo. Los clientes de correo no resuelven rutas relativas,
- * así que sale de `MAIL_LOGO_URL` o, por defecto, del front público.
- * `FRONTEND_URL` puede traer varios orígenes separados por coma (CORS): manda
- * el primero, igual que en EmailService.
+ * URL absoluta del logo. Respaldo para cuando el archivo local no existe:
+ * el correo se abre en el cliente, no en la máquina que lo generó, así que
+ * localhost nunca sirve. `FRONTEND_URL` puede traer varios orígenes separados
+ * por coma (CORS): manda el primero, igual que en EmailService.
  */
 function brandLogoUrl(): string {
   const explicit = (process.env.MAIL_LOGO_URL ?? '').trim();
@@ -84,9 +89,6 @@ function brandLogoUrl(): string {
     .split(',')[0]
     .trim()
     .replace(/\/+$/, '');
-  // localhost no sirve como fuente del logo: el correo se abre en el cliente,
-  // no en la máquina que lo generó, y la imagen sale rota. Con FRONTEND_URL mal
-  // configurado (o sin configurar) se cae al sitio público antes que a texto.
   const usableFront = front && !/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(front)
     ? front
     : PUBLIC_SITE_URL;
@@ -94,16 +96,63 @@ function brandLogoUrl(): string {
 }
 
 /**
- * Cabecera de marca: el logo, no el nombre escrito. Si no hay URL configurada
- * cae al texto para no dejar el correo decapitado.
+ * Ruta del logo en disco (assets/ del API). El correo lo lleva ADJUNTO como
+ * imagen inline (cid): con el sitio aún sin desplegar, una URL pública siempre
+ * salía rota. Si el archivo falta, la plantilla cae a la URL pública.
+ */
+export function brandLogoFilePath(): string {
+  const candidates = [
+    path.join(process.cwd(), 'assets', 'logo-livi.png'),
+    // Compilado queda en dist/modules/email/templates: 4 niveles arriba está
+    // la raíz del API. Cubre arranques con cwd distinto a la raíz.
+    path.join(__dirname, '..', '..', '..', '..', 'assets', 'logo-livi.png'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch {
+      /* seguir probando */
+    }
+  }
+  return candidates[0];
+}
+
+export function brandLogoAvailable(): boolean {
+  try {
+    return fs.existsSync(brandLogoFilePath());
+  } catch {
+    return false;
+  }
+}
+
+/** Adjunto inline del logo para el send de EmailService (null si no existe). */
+export function brandLogoAttachment(): {
+  content: Buffer;
+  filename: string;
+  contentId: string;
+  contentType: string;
+} | null {
+  if (!brandLogoAvailable()) return null;
+  try {
+    return {
+      content: fs.readFileSync(brandLogoFilePath()),
+      filename: 'logo-livi.png',
+      contentId: BRAND_LOGO_CID,
+      contentType: 'image/png',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cabecera de marca: el logo, no el nombre escrito. Con el adjunto inline se
+ * referencia por `cid:`; si el archivo no está, cae a la URL pública; y si el
+ * cliente bloquea imágenes, el `alt` con el nombre mantiene la marca.
  */
 function brandHeader(): string {
-  const logo = brandLogoUrl();
-  if (!logo) {
-    return `<span style="font-family:${SERIF};font-size:22px;letter-spacing:5px;text-transform:uppercase;color:${C.ink};">${BRAND_NAME}</span>`;
-  }
-  // `alt` con el nombre: si el cliente bloquea imágenes, la marca sigue ahí.
-  return `<img src="${logo}" alt="${BRAND_NAME}" width="180" style="display:block;width:180px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;">`;
+  const src = brandLogoAvailable() ? `cid:${BRAND_LOGO_CID}` : brandLogoUrl();
+  return `<img src="${src}" alt="${BRAND_NAME}" width="180" style="display:block;width:180px;max-width:60%;height:auto;border:0;outline:none;text-decoration:none;font-family:Georgia,serif;font-size:22px;letter-spacing:5px;color:${C.ink};">`;
 }
 
 /** Rótulo pequeño en versalitas, el mismo recurso que el sitio. */
@@ -189,7 +238,7 @@ export function baseEmailLayout(
                 <a href="mailto:${BRAND_CONTACT_EMAIL}" style="color:${C.ink};text-decoration:underline;">${BRAND_CONTACT_EMAIL}</a>
               </p>
               <p style="margin:0;font-family:${SANS};font-size:12px;line-height:1.6;color:${C.muted};">
-                ${BRAND_NAME} — Perfumes auténticos, Ecuador
+                ${BRAND_NAME} — Pañaleras y mochilas de cuero, hechas a mano en Ecuador
               </p>
             </td>
           </tr>
@@ -240,15 +289,9 @@ export function itemsTable(items: OrderEmailItem[]): string {
 
   const rows = items
     .map((i) => {
-      const detail = i.ml ? `${i.ml} ml` : 'Botella completa';
-      const backorder =
-        i.bajoPedidoQuantity && i.bajoPedidoQuantity > 0
-          ? `<br><span style="font-size:12px;color:${C.gold};">${i.bajoPedidoQuantity} bajo pedido</span>`
-          : '';
       return `<tr>
         <td style="padding:14px 12px 14px 0;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;line-height:1.5;color:${C.ink};vertical-align:top;">
-          <span style="font-family:${SERIF};font-size:16px;">${escapeHtml(i.name)}</span><br>
-          <span style="font-size:12px;color:${C.muted};">${detail}</span>${backorder}
+          <span style="font-family:${SERIF};font-size:16px;">${escapeHtml(i.name)}</span>
         </td>
         <td style="padding:14px 12px;border-bottom:1px solid ${C.line};font-family:${SANS};font-size:14px;color:${C.soft};text-align:center;white-space:nowrap;vertical-align:top;">
           ${i.quantity}

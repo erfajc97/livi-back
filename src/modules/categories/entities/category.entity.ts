@@ -41,9 +41,6 @@ export class Category {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ default: false })
-  bajoPedido: boolean;
-
   @CreateDateColumn()
   createdAt: Date;
 

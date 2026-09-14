@@ -441,3 +441,4 @@ Para errores o preguntas:
 2. Verificar .env está correctamente configurado
 3. Validar PostgreSQL está corriendo
 4. Revisar migraciones ejecutadas: `npm run migration:show`
+# livi-back

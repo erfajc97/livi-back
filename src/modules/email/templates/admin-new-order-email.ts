@@ -9,7 +9,7 @@ import {
 import { OrderEmailData } from '../email.types';
 
 /**
- * M-13 · Cualquier pedido nuevo → alerta interna a nondecants@gmail.com
+ * M-13 · Cualquier pedido nuevo → alerta interna a livi@gmail.com
  * con el detalle completo del pedido.
  */
 export function getAdminNewOrderEmailHtml(data: OrderEmailData): string {

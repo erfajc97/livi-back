@@ -14,6 +14,7 @@ import { ProductVariationImagesService } from './product-variation-images.servic
 import { ProductVariationImagesController } from './product-variation-images.controller';
 import { ProductVariationVideosService } from './product-variation-videos.service';
 import { ProductVariationVideosController } from './product-variation-videos.controller';
+import { UploadsController } from './uploads.controller';
 import { StockService } from './stock.service';
 import { S3Service } from '../../common/services/s3.service';
 import { Product } from './entities/product.entity';
@@ -24,7 +25,6 @@ import { ProductImage } from './entities/product-image.entity';
 import { ProductVideo } from './entities/product-video.entity';
 import { ProductVariationImage } from './entities/product-variation-image.entity';
 import { ProductVariationVideo } from './entities/product-variation-video.entity';
-import { BottleEvent } from './entities/bottle-event.entity';
 
 @Module({
   imports: [
@@ -37,7 +37,6 @@ import { BottleEvent } from './entities/bottle-event.entity';
       ProductVideo,
       ProductVariationImage,
       ProductVariationVideo,
-      BottleEvent,
     ]),
   ],
   controllers: [
@@ -48,6 +47,7 @@ import { BottleEvent } from './entities/bottle-event.entity';
     ProductVideosController,
     ProductVariationImagesController,
     ProductVariationVideosController,
+    UploadsController,
   ],
   providers: [
     ProductsService,

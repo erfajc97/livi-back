@@ -19,7 +19,7 @@ export class CreateCampaignDto {
   @IsString()
   ctaText?: string;
 
-  @ApiProperty({ required: false, example: 'https://nondecants.com/catalogo' })
+  @ApiProperty({ required: false, example: 'https://livi.ec/catalogo' })
   @IsOptional()
   @IsString()
   ctaUrl?: string;

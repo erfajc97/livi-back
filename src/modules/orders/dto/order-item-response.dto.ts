@@ -28,17 +28,11 @@ export class OrderItemResponseDto {
   @ApiPropertyOptional({ description: 'Product name' })
   productName?: string;
 
+  @ApiPropertyOptional({ description: 'Variation name (color, tamaño…)' })
+  variationName?: string;
+
   @ApiPropertyOptional({ description: 'Product image URL' })
   productImage?: string;
-
-  @ApiPropertyOptional({ description: 'Variation ml size' })
-  mlSize?: number;
-
-  @ApiPropertyOptional({ description: 'Is full bottle' })
-  isFullBottle?: boolean;
-
-  @ApiPropertyOptional({ example: 0, description: 'Quantity back-ordered (bajo pedido) due to stock shortage' })
-  bajoPedidoQuantity?: number;
 
   constructor(item: any) {
     this.id = item.id;
@@ -47,7 +41,6 @@ export class OrderItemResponseDto {
     this.price = Number(item.price);
     this.quantity = item.quantity;
     this.subtotal = Number(item.subtotal);
-    this.bajoPedidoQuantity = Number(item.bajoPedidoQuantity ?? 0);
 
     // Include product info if loaded
     if (item.product) {
@@ -57,8 +50,7 @@ export class OrderItemResponseDto {
         || null;
     }
     if (item.productVariation) {
-      this.mlSize = Number(item.productVariation.mlSize);
-      this.isFullBottle = item.productVariation.isFullBottle;
+      this.variationName = item.productVariation.name ?? undefined;
       // Use variation image if available, fallback to product image
       const variationImg = item.productVariation.images?.[0]?.url;
       if (variationImg) {

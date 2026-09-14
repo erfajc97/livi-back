@@ -26,8 +26,8 @@ import { OrderStatus } from '../../common/constants/order-status.enum';
 import { CartService } from '../cart/cart.service';
 import { StockService } from '../products/stock.service';
 import { EmailService } from '../email/email.service';
+import { WalletfyService } from '../walletfy/walletfy.service';
 import { OrderEmailData, OrderEmailItem } from '../email/email.types';
-import { ShipmentKind } from '../email/templates/order-shipped-email';
 
 @Injectable()
 export class OrdersService {
@@ -49,6 +49,7 @@ export class OrdersService {
     private stockService: StockService,
     private emailService: EmailService,
     private usersService: UsersService,
+    private walletfyService: WalletfyService,
   ) {}
 
   /**
@@ -59,15 +60,10 @@ export class OrdersService {
     const items: OrderEmailItem[] = (order.items ?? []).map((item) => {
       const variation = item.productVariation;
       const name = item.product?.name ?? variation?.product?.name ?? 'Producto';
-      const ml = variation && !variation.isFullBottle ? Number(variation.mlSize) : undefined;
       return {
         name,
         quantity: item.quantity,
         price: Number(item.price),
-        ml,
-        bajoPedidoQuantity: item.bajoPedidoQuantity
-          ? Number(item.bajoPedidoQuantity)
-          : undefined,
       };
     });
 
@@ -90,18 +86,6 @@ export class OrdersService {
     };
   }
 
-  /**
-   * Tipo de envío según las líneas del pedido: un pedido con productos bajo
-   * pedido se despacha en dos veces (el primero avisa que falta la otra parte,
-   * el segundo la cierra).
-   */
-  private shipmentKind(order: Order, hadTrackingBefore: boolean): ShipmentKind {
-    const hasBackorder = (order.items ?? []).some(
-      (i) => Number(i.bajoPedidoQuantity ?? 0) > 0,
-    );
-    if (!hasBackorder) return 'full';
-    return hadTrackingBefore ? 'backorder' : 'partial';
-  }
 
   /**
    * Correos que dispara una actualización del pedido (M-03 a M-08).
@@ -143,7 +127,7 @@ export class OrdersService {
         .sendOrderShippedEmail(
           data,
           order.trackingCode,
-          this.shipmentKind(order, hadTrackingBefore),
+          'full',
         )
         .catch(fail('M-05/06/07'));
     }
@@ -237,9 +221,6 @@ export class OrdersService {
       // Validate and process items
       const orderItems: OrderItem[] = [];
       let total = 0;
-      // Demanda de decants acumulada por producto (ml). Tope: el ml físico del
-      // producto (no se importan decants sueltos sin frasco que abrir).
-      const decantDemand = new Map<number, { product: Product; ml: number }>();
 
       for (const itemDto of createOrderDto.items) {
         // Validate that either productId or productVariationId is provided, but not both
@@ -287,16 +268,6 @@ export class OrdersService {
             );
           }
 
-          // Stock: el frasco completo SIEMPRE se puede pedir. Si no queda stock
-          // sellado, el excedente se importa bajo pedido (se calcula y registra
-          // como bajoPedidoQuantity al confirmar el pago). Los decants se topan
-          // al ml físico del producto; si los frascos del mismo pedido ocupan
-          // ese ml, el sobrante queda bajo pedido al descontar.
-          if (!productVariation.isFullBottle) {
-            const ml = Number(productVariation.mlSize || 0) * itemDto.quantity;
-            const prev = decantDemand.get(product.id);
-            decantDemand.set(product.id, { product, ml: (prev?.ml ?? 0) + ml });
-          }
           price = productVariation.price || product.price;
           productId = product.id;
           productVariationId = productVariation.id;
@@ -319,25 +290,18 @@ export class OrdersService {
           }
 
           const activeVariations = product.variations?.filter((v) => v.isActive) || [];
-          const fullBottleVariation = activeVariations.find((v) => v.isFullBottle);
 
-          if (fullBottleVariation) {
-            // Treat productId-only as full-bottle sale through the variation
-            price = Number(fullBottleVariation.price || product.price);
-            productId = product.id;
-            productVariationId = fullBottleVariation.id;
-            productVariation = fullBottleVariation;
-          } else if (activeVariations.length > 0) {
-            // Product has only decant variations — caller must specify one
+          if (activeVariations.length > 0) {
+            // El producto tiene variantes (color, tamaño…): hay que pedir una
+            // variación específica, no el producto base.
             throw new BadRequestException(
               `Product with ID ${itemDto.productId} has variations. You must order a specific variation instead of the base product. Available variations: ${activeVariations.map((v) => v.id).join(', ')}`,
             );
-          } else {
-            // No variations at all — legacy path, sell the base product. El
-            // frasco siempre se puede pedir; el excedente se importa bajo pedido.
-            price = product.price;
-            productId = product.id;
           }
+
+          // Sin variaciones: se vende el producto base directamente.
+          price = product.price;
+          productId = product.id;
         } else {
           // This should never happen due to validation, but TypeScript needs this
           throw new BadRequestException(
@@ -374,19 +338,6 @@ export class OrdersService {
         const orderItem = queryRunner.manager.create(OrderItem, orderItemData);
 
         orderItems.push(orderItem);
-      }
-
-      // Validar decants: nunca permitir más ml de los que existen físicamente.
-      // (Los frascos del mismo pedido no restan aquí: si se llevan el stock, el
-      // descuento marca esos decants como bajo pedido en vez de rechazarlos.)
-      for (const { product: p, ml } of decantDemand.values()) {
-        const availableMl = this.stockService.getAvailableMl(p);
-        if (availableMl < ml) {
-          throw new BadRequestException(
-            `No hay suficiente stock para preparar los decants de "${p.name}". ` +
-              `Disponible: ${availableMl} ml, solicitado: ${ml} ml.`,
-          );
-        }
       }
 
       // Fetch user info for customer details
@@ -614,68 +565,23 @@ export class OrdersService {
       return true;
     });
 
-    // Resolver las variaciones una sola vez: hace falta saber cuáles son
-    // decants ANTES de descontar para poder ordenar el descuento.
-    const variations = new Map<number, ProductVariation>();
     for (const item of pendingItems) {
-      if (item.productVariationId && !variations.has(item.productVariationId)) {
-        const v = await this.productVariationsRepository.findOne({
+      console.log(`[StockDeduction] Item: productId=${item.productId}, variationId=${item.productVariationId}, qty=${item.quantity}`);
+      let product: Product | null = null;
+      if (item.productVariationId) {
+        const variation = await this.productVariationsRepository.findOne({
           where: { id: item.productVariationId },
           relations: ['product'],
         });
-        if (v) variations.set(item.productVariationId, v);
-      }
-    }
-
-    // Los frascos sellados tienen prioridad sobre los decants: si el pedido
-    // lleva ambos del mismo producto, las botellas consumen el stock y los ml
-    // que ya no alcanzan quedan como bajoPedidoQuantity en los decants.
-    const isDecant = (item: OrderItem) => {
-      const v = item.productVariationId ? variations.get(item.productVariationId) : null;
-      return v ? !v.isFullBottle : false;
-    };
-    const ordered = [...pendingItems].sort(
-      (a, b) => Number(isDecant(a)) - Number(isDecant(b)),
-    );
-
-    for (const item of ordered) {
-      console.log(`[StockDeduction] Item: productId=${item.productId}, variationId=${item.productVariationId}, qty=${item.quantity}`);
-      if (item.productVariationId) {
-        const variation = variations.get(item.productVariationId);
-
-        if (!variation || !variation.product) continue;
-
-        if (variation.isFullBottle) {
-          const result = await this.stockService.deductFullBottleStock(
-            variation.product,
-            item.quantity,
-            queryRunner,
-          );
-          item.bajoPedidoQuantity = result.pendingQuantity;
-        } else {
-          const result = await this.stockService.deductDecantStock(
-            variation.product,
-            Number(variation.mlSize),
-            item.quantity,
-            queryRunner,
-          );
-          item.mlDeducted = result.mlDeducted;
-          item.bottlesOpened = result.bottlesOpened;
-          item.bajoPedidoQuantity = result.pendingQuantity;
-        }
+        product = variation?.product ?? null;
       } else if (item.productId) {
-        const product = await this.productsRepository.findOne({
+        product = await this.productsRepository.findOne({
           where: { id: item.productId },
         });
+      }
 
-        if (product) {
-          const result = await this.stockService.deductFullBottleStock(
-            product,
-            item.quantity,
-            queryRunner,
-          );
-          item.bajoPedidoQuantity = result.pendingQuantity;
-        }
+      if (product) {
+        await this.stockService.deductStock(product, item.quantity, queryRunner);
       }
       item.stockDeductedAt = now;
       await queryRunner.manager.save(OrderItem, item);
@@ -690,40 +596,21 @@ export class OrdersService {
     queryRunner: import('typeorm').QueryRunner,
   ): Promise<void> {
     for (const item of order.items) {
+      let product: Product | null = null;
       if (item.productVariationId) {
         const variation = await this.productVariationsRepository.findOne({
           where: { id: item.productVariationId },
           relations: ['product'],
         });
-
-        if (!variation || !variation.product) continue;
-
-        if (variation.isFullBottle) {
-          await this.stockService.restoreFullBottleStock(
-            variation.product,
-            item.quantity,
-            queryRunner,
-          );
-        } else if (item.mlDeducted && Number(item.mlDeducted) > 0) {
-          await this.stockService.restoreDecantStock(
-            variation.product,
-            Number(item.mlDeducted),
-            queryRunner,
-          );
-        }
+        product = variation?.product ?? null;
       } else if (item.productId) {
-        // Full bottle — restore sealed stock
-        const product = await this.productsRepository.findOne({
+        product = await this.productsRepository.findOne({
           where: { id: item.productId },
         });
+      }
 
-        if (product) {
-          await this.stockService.restoreFullBottleStock(
-            product,
-            item.quantity,
-            queryRunner,
-          );
-        }
+      if (product) {
+        await this.stockService.restoreStock(product, item.quantity, queryRunner);
       }
     }
   }
@@ -849,6 +736,10 @@ export class OrdersService {
 
         await queryRunner.manager.save(Order, order);
         await queryRunner.commitTransaction();
+
+        // Walletfy · sello de fidelidad al confirmar el pago por transferencia:
+        // el admin mueve la orden a RECEIVED (o más allá) y ahí se marca paid.
+        if (needsStockDeduction) this.rewardWalletfy(order);
 
         // Record status change in history (outside transaction, non-critical)
         await this.recordStatusChange(
@@ -1225,7 +1116,25 @@ export class OrdersService {
       'Venta manual',
     ).catch(() => {});
 
+    // Walletfy · la venta manual nace cobrada: sello de fidelidad de una vez.
+    this.rewardWalletfy(saved);
+
     return saved;
+  }
+
+  /**
+   * Suma el sello/puntos de la compra en Walletfy (tarjeta de fidelidad).
+   * Fire-and-forget: un fallo de Walletfy jamás rompe el flujo de la orden.
+   */
+  private rewardWalletfy(order: Order): void {
+    this.walletfyService
+      .rewardOrder({
+        name: order.customerName ?? '',
+        email: order.customerEmail,
+        phone: order.customerPhone,
+        total: Number(order.total),
+      })
+      .catch((err) => console.error('[Orders] Walletfy falló:', err?.message));
   }
 }
 

@@ -14,37 +14,21 @@ import {
   servientregaTrackingUrl,
 } from '../email.types';
 
-export type ShipmentKind = 'full' | 'partial' | 'backorder';
+export type ShipmentKind = 'full';
 
 /**
- * M-05 / M-06 / M-07 · Guía Servientrega generada.
- * - full: pedido completo despachado (M-05).
- * - partial: pedido mixto, se despacha lo que está en stock (M-06) — aclara
- *   que los productos bajo pedido llegarán después con su propia guía.
- * - backorder: segunda guía con los productos bajo pedido (M-07).
+ * M-05 · Guía Servientrega generada: pedido completo despachado.
  */
 export function getOrderShippedEmailHtml(
   data: OrderEmailData,
   trackingCode: string,
-  kind: ShipmentKind,
+  kind: ShipmentKind = 'full',
 ): string {
   const trackingUrl = servientregaTrackingUrl(trackingCode);
 
-  const intro =
-    kind === 'backorder'
-      ? `Los productos bajo pedido de tu orden
-         <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> ya fueron despachados.
-         Este es el segundo envío de tu pedido.`
-      : `Tu pedido <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> fue despachado.`;
+  const intro = `Tu pedido <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(data.orderNumber)}</strong> fue despachado.`;
 
-  const mixedNotice =
-    kind === 'partial'
-      ? noticeBlock(
-          `Este envío incluye los productos disponibles en stock. Los productos
-          <strong>bajo pedido</strong> llegarán después y generarán su propia guía:
-          te avisaremos con su tracking cuando sean despachados.`,
-        )
-      : '';
+  const mixedNotice = '';
 
   const body = `
     ${greeting(data)}
@@ -65,7 +49,7 @@ export function getOrderShippedEmailHtml(
     ${itemsTable(data.items)}
     ${shippingBlock(data)}
     ${paragraph(
-      'También puedes revisar el estado de tu pedido cuando quieras desde tu cuenta en NonDecants.',
+      'También puedes revisar el estado de tu pedido cuando quieras desde tu cuenta en LIVI.',
     )}
     ${whatsappClosing(data.orderNumber)}
   `;

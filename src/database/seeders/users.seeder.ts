@@ -24,7 +24,7 @@ export class UsersSeeder extends BaseSeeder {
       email: ADMIN_EMAIL,
       password: hashedPassword,
       firstName: 'Admin',
-      lastName: 'NönDecants',
+      lastName: 'LIVI',
       role: Role.ADMIN,
       isActive: true,
       isEmailVerified: true,

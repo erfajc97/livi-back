@@ -27,7 +27,7 @@ import { getOrderDeliveredEmailHtml } from './templates/order-delivered-email';
 import { getAbandonedCartEmailHtml } from './templates/abandoned-cart-email';
 import { getWelcomeEmailHtml } from './templates/welcome-email';
 import { getAdminNewOrderEmailHtml } from './templates/admin-new-order-email';
-import { BRAND_NAME } from './templates/base-layout';
+import { BRAND_NAME, brandLogoAttachment } from './templates/base-layout';
 import { OrderEmailData, OrderEmailItem } from './email.types';
 
 @Injectable()
@@ -53,7 +53,7 @@ export class EmailService {
     // en Resend (SPF + DKIM) o los envíos se rechazan.
     this.fromEmail =
       this.configService.get<string>('MAIL_FROM_EMAIL') ||
-      'noreply@nondecants.com';
+      'noreply@livi.ec';
     this.fromName =
       this.configService.get<string>('MAIL_FROM_NAME') || BRAND_NAME;
     // FRONTEND_URL también alimenta la lista de CORS y puede venir con varios
@@ -77,7 +77,7 @@ export class EmailService {
     }
     // M-13: alerta interna de pedidos nuevos.
     this.adminEmail =
-      this.configService.get<string>('ADMIN_EMAIL') || 'nondecants@gmail.com';
+      this.configService.get<string>('ADMIN_EMAIL') || 'livi@gmail.com';
   }
 
   /**
@@ -98,6 +98,9 @@ export class EmailService {
     }
 
     try {
+      // El logo viaja adjunto (cid:livi-logo): la plantilla lo referencia en el
+      // encabezado y no depende de que el sitio público esté desplegado.
+      const logo = brandLogoAttachment();
       // Resend responde 200 con `error` en el cuerpo cuando rechaza el envío
       // (dominio sin verificar, destinatario inválido…): hay que mirarlo.
       const { error } = await this.resend.emails.send({
@@ -105,6 +108,7 @@ export class EmailService {
         to: [to],
         subject,
         html,
+        ...(logo ? { attachments: [logo] } : {}),
       });
       if (error) {
         this.logger.error(
@@ -126,7 +130,7 @@ export class EmailService {
     const verificationUrl = `${this.frontendUrl}/verificar-email?token=${token}`;
     await this.send(
       email,
-      'Verifica tu email — NonDecants',
+      'Verifica tu email — LIVI',
       getVerificationEmailHtml(firstName, verificationUrl),
       'Correo de verificación',
     );
@@ -140,7 +144,7 @@ export class EmailService {
     const resetUrl = `${this.frontendUrl}/restablecer-contrasena?token=${token}`;
     await this.send(
       email,
-      'Restablecer contraseña — NonDecants',
+      'Restablecer contraseña — LIVI',
       getPasswordResetEmailHtml(firstName, resetUrl),
       'Correo de restablecimiento de contraseña',
     );
@@ -156,7 +160,7 @@ export class EmailService {
   ): Promise<void> {
     await this.send(
       email,
-      'Tu cuenta entra con Google — NonDecants',
+      'Tu cuenta entra con Google — LIVI',
       getPasswordResetGoogleNoticeHtml(firstName, `${this.frontendUrl}/`),
       'Aviso de cuenta Google',
     );
@@ -174,7 +178,7 @@ export class EmailService {
     const loginUrl = `${this.frontendUrl}/mi-cuenta`;
     await this.send(
       email,
-      'Tu cuenta de NonDecants está lista — NonDecants',
+      'Tu cuenta de LIVI está lista — LIVI',
       getGuestAccountEmailHtml(firstName, email, password, loginUrl),
       'Correo de cuenta guest',
     );
@@ -192,7 +196,7 @@ export class EmailService {
     const loginUrl = `${this.frontendUrl}/mi-cuenta`;
     await this.send(
       email,
-      'Tu contraseña fue actualizada — NonDecants',
+      'Tu contraseña fue actualizada — LIVI',
       getAdminPasswordResetEmailHtml(firstName, email, password, loginUrl),
       'Correo de contraseña asignada por admin',
     );
@@ -202,7 +206,7 @@ export class EmailService {
   async sendWelcomeEmail(email: string, firstName: string): Promise<void> {
     await this.send(
       email,
-      'Bienvenido a NonDecants — NonDecants',
+      'Bienvenido a LIVI — LIVI',
       getWelcomeEmailHtml(firstName, this.frontendUrl),
       'Correo de bienvenida',
     );
@@ -236,7 +240,7 @@ export class EmailService {
   async sendTransferReceivedEmail(data: OrderEmailData): Promise<void> {
     await this.send(
       data.customerEmail,
-      `Recibimos tu orden ${data.orderNumber} — NonDecants`,
+      `Recibimos tu orden ${data.orderNumber} — LIVI`,
       getTransferReceivedEmailHtml(data),
       'Acuse de transferencia (M-02)',
     );
@@ -246,7 +250,7 @@ export class EmailService {
   async sendTransferApprovedEmail(data: OrderEmailData): Promise<void> {
     await this.send(
       data.customerEmail,
-      `Pedido confirmado ${data.orderNumber} — NonDecants`,
+      `Pedido confirmado ${data.orderNumber} — LIVI`,
       getTransferApprovedEmailHtml(data),
       'Transferencia aprobada (M-03)',
     );
@@ -256,31 +260,26 @@ export class EmailService {
   async sendTransferRejectedEmail(data: OrderEmailData): Promise<void> {
     await this.send(
       data.customerEmail,
-      `No pudimos validar tu pago — orden ${data.orderNumber} — NonDecants`,
+      `No pudimos validar tu pago — orden ${data.orderNumber} — LIVI`,
       getTransferRejectedEmailHtml(data),
       'Transferencia rechazada (M-04)',
     );
   }
 
   /**
-   * M-05 / M-06 / M-07 · Guía Servientrega generada → despacho + tracking.
-   * `kind`: 'full' pedido completo, 'partial' primer envío de pedido mixto,
-   * 'backorder' segunda guía con los productos bajo pedido.
+   * M-05 · Guía Servientrega generada → despacho + tracking.
    */
   async sendOrderShippedEmail(
     data: OrderEmailData,
     trackingCode: string,
-    kind: ShipmentKind,
+    kind: ShipmentKind = 'full',
   ): Promise<void> {
-    const subject =
-      kind === 'backorder'
-        ? `Tu pedido ${data.orderNumber} fue despachado (segundo envío) — NonDecants`
-        : `Tu pedido ${data.orderNumber} fue despachado — NonDecants`;
+    const subject = `Tu pedido ${data.orderNumber} fue despachado — LIVI`;
     await this.send(
       data.customerEmail,
       subject,
       getOrderShippedEmailHtml(data, trackingCode, kind),
-      `Guía de despacho (M-05/06/07, ${kind})`,
+      `Guía de despacho (M-05, ${kind})`,
     );
   }
 
@@ -291,7 +290,7 @@ export class EmailService {
   ): Promise<void> {
     await this.send(
       email,
-      'Tu perfume ha llegado — NonDecants',
+      'Tu pedido ha llegado — LIVI',
       getOrderDeliveredEmailHtml(customerName),
       'Carta de agradecimiento (M-08)',
     );
@@ -305,13 +304,13 @@ export class EmailService {
   ): Promise<void> {
     await this.send(
       email,
-      'Tu carrito te espera — NonDecants',
+      'Tu carrito te espera — LIVI',
       getAbandonedCartEmailHtml(firstName, items, this.frontendUrl),
       'Recordatorio de carrito abandonado (M-09)',
     );
   }
 
-  /** M-13 · Alerta interna de pedido nuevo a nondecants@gmail.com. */
+  /** M-13 · Alerta interna de pedido nuevo a livi@gmail.com. */
   async sendAdminNewOrderEmail(data: OrderEmailData): Promise<void> {
     await this.send(
       this.adminEmail,

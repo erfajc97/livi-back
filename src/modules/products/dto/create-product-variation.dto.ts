@@ -5,11 +5,9 @@ import {
   IsBoolean,
   IsString,
   IsArray,
-  IsEnum,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PresentationType } from '../entities/product-variation.entity';
 
 export class CreateProductVariationDto {
   @ApiProperty({ description: 'Product ID this variation belongs to' })
@@ -17,34 +15,13 @@ export class CreateProductVariationDto {
   @IsNotEmpty()
   productId: number;
 
-  @ApiProperty({ example: 5, description: 'Decant size in ml (e.g., 3, 5, 10) or full bottle ml', minimum: 0 })
-  @IsNumber()
-  @Min(0)
-  @IsNotEmpty()
-  mlSize: number;
-
-  @ApiPropertyOptional({ example: false, description: 'Whether this variation is a full sealed bottle', default: false })
-  @IsBoolean()
-  @IsOptional()
-  isFullBottle?: boolean;
-
-  @ApiPropertyOptional({
-    enum: PresentationType,
-    example: PresentationType.DECANT,
-    description: "Tipo de presentación: 'decant' | 'sellada' | 'original' (50ml, 100ml, etc.). Si no viene, se deriva de isFullBottle. 'sellada'/'original' implican isFullBottle = true salvo que se envíe explícito.",
-    default: PresentationType.DECANT,
-  })
-  @IsEnum(PresentationType)
-  @IsOptional()
-  presentationType?: PresentationType;
-
-  @ApiPropertyOptional({ example: 15.0, description: 'Override price for this variation', minimum: 0 })
+  @ApiPropertyOptional({ example: 129.0, description: 'Override price for this variation', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsOptional()
   price?: number;
 
-  @ApiPropertyOptional({ example: 8.5, description: 'Override unit acquisition cost for this variation', minimum: 0 })
+  @ApiPropertyOptional({ example: 70.0, description: 'Override unit acquisition cost for this variation', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsOptional()
@@ -55,10 +32,20 @@ export class CreateProductVariationDto {
   @IsOptional()
   sku?: string;
 
-  @ApiPropertyOptional({ example: '5ml Decant', description: 'Variation display name' })
+  @ApiPropertyOptional({ example: 'Negro', description: 'Variation display name (color, tamaño…)' })
   @IsString()
   @IsOptional()
   name?: string;
+
+  @ApiPropertyOptional({ example: '#12100E', description: 'Color del swatch en hexadecimal (picker del admin)' })
+  @IsString()
+  @IsOptional()
+  colorHex?: string;
+
+  @ApiPropertyOptional({ example: 'Midi', description: 'Talla de la variante (una variante = color + talla)' })
+  @IsString()
+  @IsOptional()
+  size?: string;
 
   @ApiPropertyOptional({ description: 'Array of ProductOptionValue IDs' })
   @IsArray()
@@ -66,7 +53,7 @@ export class CreateProductVariationDto {
   @IsOptional()
   optionValueIds?: number[];
 
-  @ApiPropertyOptional({ description: 'Whether this variation is active', default: true }) 
+  @ApiPropertyOptional({ description: 'Whether this variation is active', default: true })
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

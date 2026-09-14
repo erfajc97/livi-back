@@ -1,7 +1,6 @@
-import { IsOptional, IsString, IsNumber, IsEnum, Min } from 'class-validator';
+import { IsOptional, IsString, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class FilterProductsDto extends PaginationDto {
@@ -17,7 +16,7 @@ export class FilterProductsDto extends PaginationDto {
   @IsNumber()
   marcaId?: number;
 
-  @ApiPropertyOptional({ example: 'Sauvage', description: 'Search in product name' })
+  @ApiPropertyOptional({ example: 'Noé', description: 'Search in product name' })
   @IsOptional()
   @IsString()
   search?: string;
@@ -38,33 +37,9 @@ export class FilterProductsDto extends PaginationDto {
 
   @ApiPropertyOptional({ example: true, description: 'Filter by active status ("true"/"false", default: true)' })
   @IsOptional()
-  // String a propósito (como bajoPedido): con enableImplicitConversion, un
-  // boolean DTO convertiría el query param 'false' en true. Se parsea en el service.
+  // String a propósito: con enableImplicitConversion, un boolean DTO
+  // convertiría el query param 'false' en true. Se parsea en el service.
   isActive?: string;
-
-  @ApiPropertyOptional({ example: false, description: 'Filter by bajo pedido status' })
-  @IsOptional()
-  bajoPedido?: string;
-
-  @ApiPropertyOptional({ enum: Gender, description: 'Filter by gender' })
-  @IsOptional()
-  @IsEnum(Gender)
-  gender?: Gender;
-
-  @ApiPropertyOptional({ enum: TimeOfDay, description: 'Filter by time of day' })
-  @IsOptional()
-  @IsEnum(TimeOfDay)
-  timeOfDay?: TimeOfDay;
-
-  @ApiPropertyOptional({ enum: Concentration, description: 'Filter by concentration' })
-  @IsOptional()
-  @IsEnum(Concentration)
-  concentration?: Concentration;
-
-  @ApiPropertyOptional({ enum: Projection, description: 'Filter by projection' })
-  @IsOptional()
-  @IsEnum(Projection)
-  projection?: Projection;
 
   @ApiPropertyOptional({ example: true, description: 'Filter products with discount' })
   @IsOptional()

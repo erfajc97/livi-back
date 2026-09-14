@@ -74,31 +74,6 @@ export class ProductImagesService {
   }
 
   /**
-   * Sube la imagen de "La firma" (PDP) a S3 y la guarda en product.signatureImageUrl.
-   * No crea registro en product_images (no es parte de la galería).
-   */
-  async uploadSignatureImage(
-    productId: number,
-    file: Express.Multer.File,
-  ): Promise<{ signatureImageUrl: string }> {
-    const product = await this.productsRepository.findOne({ where: { id: productId } });
-    if (!product) {
-      throw new NotFoundException(`Product with ID ${productId} not found`);
-    }
-    if (!file) {
-      throw new BadRequestException('No file provided');
-    }
-    const [result] = await this.s3Service.uploadFiles(
-      [file],
-      `products/${productId}/signature`,
-      this.ALLOWED_IMAGE_TYPES,
-    );
-    product.signatureImageUrl = result.url;
-    await this.productsRepository.save(product);
-    return { signatureImageUrl: result.url };
-  }
-
-  /**
    * Get all images for a product
    */
   async findAll(productId: number): Promise<ProductImageResponseDto[]> {

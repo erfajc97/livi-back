@@ -1,7 +1,7 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
 
-const BOOL_FIELDS = ['isActive', 'bajoPedido', 'isFeatured', 'isPublished', 'inStock', 'isOnSale'];
+const BOOL_FIELDS = ['isActive', 'isFeatured', 'isPublished', 'inStock', 'isOnSale'];
 
 function coerce(value: unknown): unknown {
   if (value === 'true') return true;

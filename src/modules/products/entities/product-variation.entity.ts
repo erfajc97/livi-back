@@ -16,20 +16,6 @@ import { ProductOptionValue } from './product-option-value.entity';
 import { ProductVariationImage } from './product-variation-image.entity';
 import { ProductVariationVideo } from './product-variation-video.entity';
 
-/**
- * Tipo de presentación de la variante (REQ-056):
- *  - decant:   decant fraccionado (3/5/10 ml…) — sale de la botella abierta.
- *  - sellada:  botella sellada del formato estándar del producto (totalMl).
- *  - original: presentación original alternativa (50ml, 100ml, etc.).
- * `isFullBottle` sigue gobernando la lógica de inventario (sellada/original = true);
- * este campo es la clasificación que elige el admin y que ve el cliente.
- */
-export enum PresentationType {
-  DECANT = 'decant',
-  SELLADA = 'sellada',
-  ORIGINAL = 'original',
-}
-
 @Entity('product_variations')
 @Index(['productId'])
 export class ProductVariation {
@@ -55,9 +41,19 @@ export class ProductVariation {
   @Column({ nullable: true, unique: true })
   sku: string;
 
-  // Variation name/description (e.g., "XL - Green")
+  // Variation name/description (e.g., "Negro", "Espresso")
   @Column({ nullable: true })
   name: string;
+
+  // Color del swatch en hexadecimal (ej. "#12100E"). Lo define el admin con
+  // un picker; si falta, el front cae al mapa por nombre.
+  @Column({ nullable: true })
+  colorHex: string;
+
+  // Talla de la variante (ej. "Midi"). Una variante es la combinación
+  // color (name) + talla (size); NULL = la variante no tiene talla.
+  @Column({ nullable: true })
+  size: string;
 
   // Link to option values that define this variation
   @ManyToMany(() => ProductOptionValue)
@@ -67,18 +63,6 @@ export class ProductVariation {
     inverseJoinColumn: { name: 'optionValueId', referencedColumnName: 'id' },
   })
   optionValues: ProductOptionValue[];
-
-  // Decant size in ml (e.g., 3, 5, 10) or full bottle ml
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  mlSize: number;
-
-  // Whether this variation represents a full sealed bottle
-  @Column({ default: false })
-  isFullBottle: boolean;
-
-  // Presentation type chosen in the admin (decant / sellada / original)
-  @Column({ type: 'enum', enum: PresentationType, default: PresentationType.DECANT })
-  presentationType: PresentationType;
 
   @Column({ default: true })
   isActive: boolean;

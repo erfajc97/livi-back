@@ -40,9 +40,6 @@ export class Marca {
   @Column({ nullable: true })
   mobileImageKey: string;
 
-  @Column({ default: false })
-  bajoPedido: boolean;
-
   @ManyToOne(() => Category, (category) => category.marcas)
   @JoinColumn({ name: 'categoryId' })
   category: Category;

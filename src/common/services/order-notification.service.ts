@@ -12,7 +12,7 @@ interface OrderNotificationData {
   deliveryMethod?: string;
   shippingAddress?: string;
   shippingCity?: string;
-  items: { name: string; quantity: number; price: number; ml?: number }[];
+  items: { name: string; quantity: number; price: number }[];
 }
 
 @Injectable()
@@ -28,7 +28,7 @@ export class OrderNotificationService {
 
   /**
    * Notificaciones de pedido nuevo: alerta interna por correo (M-13, a
-   * nondecants@gmail.com vía EmailService) + link de WhatsApp para el admin.
+   * livi@gmail.com vía EmailService) + link de WhatsApp para el admin.
    * Los correos al cliente NO se envían aquí: siguen la matriz de mailing
    * (M-01 al aprobarse la tarjeta, M-02 al subir el comprobante, etc.).
    *
@@ -71,11 +71,11 @@ export class OrderNotificationService {
 
   private buildWhatsappUrl(data: OrderNotificationData): string {
     const itemsList = data.items
-      .map((i) => `• ${i.quantity}x ${i.name}${i.ml ? ` (${i.ml}ml)` : ''} — $${i.price.toFixed(2)}`)
+      .map((i) => `• ${i.quantity}x ${i.name} — $${i.price.toFixed(2)}`)
       .join('\n');
 
     const msg = [
-      `🛒 *Nueva orden NonDecants*`,
+      `🛒 *Nueva orden LIVI*`,
       ``,
       `📋 *Orden:* ${data.orderNumber}`,
       `👤 *Cliente:* ${data.customerName}`,

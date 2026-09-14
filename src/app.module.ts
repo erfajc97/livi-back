@@ -19,6 +19,7 @@ import { CouponsModule } from './modules/coupons/coupons.module';
 import { ProductTypesModule } from './modules/product-types/product-types.module';
 import { LandingSectionsModule } from './modules/landing-sections/landing-sections.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { WalletfyModule } from './modules/walletfy/walletfy.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { HealthModule } from './modules/health/health.module';
@@ -53,6 +54,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     ProductTypesModule,
     LandingSectionsModule,
     PaymentsModule,
+    WalletfyModule,
     SettingsModule,
     NewsletterModule,
     ...(process.env.SKIP_DB_CONNECTION !== 'true' ? [HealthModule] : []),

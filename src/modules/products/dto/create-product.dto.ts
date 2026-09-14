@@ -2,85 +2,48 @@ import {
   IsString,
   IsNotEmpty,
   IsNumber,
-  IsEnum,
   IsOptional,
   IsBoolean,
   IsArray,
   ValidateNested,
   Min,
-  Max,
   IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
-import { PresentationType } from '../entities/product-variation.entity';
 
-// ── Perfil olfativo (secciones anidadas) ──
-class ScentNoteDto {
-  @ApiProperty()
+// ── Variación (color, tamaño, etc.) para creación/importación ──
+export class CreateProductVariantDto {
+  @ApiProperty({ example: 'Negro', description: 'Nombre visible de la variación (color, tamaño…)' })
   @IsString()
+  @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: 'Color hex (ej. #E8D8C0)' })
-  @IsString()
-  color: string;
-}
-
-class ScentSectionDto {
-  @ApiProperty({ example: 'Notas de salida' })
-  @IsString()
-  title: string;
-
-  @ApiProperty({ type: [ScentNoteDto] })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ScentNoteDto)
-  notes: ScentNoteDto[];
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
-
-// ── Variación (decant o botella) para creación/importación ──
-export class CreateProductVariantDto {
-  @ApiProperty({ example: 5, description: 'Tamaño en ml (3, 5, 10… o ml de la botella)' })
-  @IsNumber()
-  @Min(0)
-  mlSize: number;
-
-  @ApiProperty({ example: 23.75, description: 'Precio de esta variación', minimum: 0 })
+  @ApiProperty({ example: 129.0, description: 'Precio de esta variación', minimum: 0 })
   @IsNumber()
   @Min(0)
   price: number;
 
-  @ApiPropertyOptional({ example: 12.5, description: 'Costo de adquisición de la variación', minimum: 0 })
+  @ApiPropertyOptional({ example: 70.0, description: 'Costo de adquisición de la variación', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsOptional()
   cost?: number;
 
-  @ApiPropertyOptional({ example: 'Sauvage Elixir - Decant 5ml', description: 'Nombre visible; se genera si viene vacío' })
+  @ApiPropertyOptional({ description: 'SKU de la variación' })
   @IsString()
   @IsOptional()
-  name?: string;
+  sku?: string;
 
-  @ApiPropertyOptional({ example: false, description: 'true = botella sellada completa', default: false })
-  @IsBoolean()
+  @ApiPropertyOptional({ example: '#12100E', description: 'Color del swatch en hexadecimal (picker del admin)' })
+  @IsString()
   @IsOptional()
-  isFullBottle?: boolean;
+  colorHex?: string;
 
-  @ApiPropertyOptional({
-    enum: PresentationType,
-    example: PresentationType.DECANT,
-    description: "Tipo de presentación: 'decant' | 'sellada' | 'original' (50ml, 100ml, etc.). Si no viene, se deriva de isFullBottle.",
-    default: PresentationType.DECANT,
-  })
-  @IsEnum(PresentationType)
+  @ApiPropertyOptional({ example: 'Midi', description: 'Talla de la variante (una variante = color + talla)' })
+  @IsString()
   @IsOptional()
-  presentationType?: PresentationType;
+  size?: string;
 
   @ApiPropertyOptional({ example: true, default: true })
   @IsBoolean()
@@ -89,12 +52,12 @@ export class CreateProductVariantDto {
 }
 
 export class CreateProductDto {
-  @ApiProperty({ example: 'Paco Rabanne', description: 'Product name' })
+  @ApiProperty({ example: 'Noé Leather Backpack', description: 'Product name' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 120.0, description: 'Product price (full bottle)', minimum: 0 })
+  @ApiProperty({ example: 129.0, description: 'Product price', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsNotEmpty()
@@ -106,13 +69,7 @@ export class CreateProductDto {
   @IsOptional()
   cost?: number;
 
-  @ApiProperty({ example: 100, description: 'Total ml per bottle', minimum: 0 })
-  @IsNumber()
-  @Min(0)
-  @IsNotEmpty()
-  totalMl: number;
-
-  @ApiPropertyOptional({ example: 'Iconic fragrance with fresh and woody notes', description: 'Product description' })
+  @ApiPropertyOptional({ example: 'Mochila pañalera premium de cuero…', description: 'Product description' })
   @IsString()
   @IsOptional()
   description?: string;
@@ -122,7 +79,7 @@ export class CreateProductDto {
   @IsOptional()
   imageUrl?: string;
 
-  @ApiPropertyOptional({ example: 50, description: 'Sealed bottles in stock', minimum: 0 })
+  @ApiPropertyOptional({ example: 50, description: 'Units in stock', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsOptional()
@@ -143,102 +100,43 @@ export class CreateProductDto {
   @IsOptional()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ example: false, description: 'Available for pre-order (bajo pedido)', default: false })
-  @IsBoolean()
-  @IsOptional()
-  bajoPedido?: boolean;
-
-  @ApiPropertyOptional({ enum: Gender, example: Gender.HOMBRE, description: 'Target gender' })
-  @IsEnum(Gender)
-  @IsOptional()
-  gender?: Gender;
-
-  @ApiPropertyOptional({ enum: TimeOfDay, example: TimeOfDay.DIA, description: 'Recommended time of day' })
-  @IsEnum(TimeOfDay)
-  @IsOptional()
-  timeOfDay?: TimeOfDay;
-
-  @ApiPropertyOptional({ enum: Concentration, example: Concentration.EAU_DE_PARFUM, description: 'Fragrance concentration' })
-  @IsEnum(Concentration)
-  @IsOptional()
-  concentration?: Concentration;
-
-  @ApiPropertyOptional({ enum: Projection, example: Projection.MODERADA, description: 'Fragrance projection' })
-  @IsEnum(Projection)
-  @IsOptional()
-  projection?: Projection;
-
   @ApiPropertyOptional({ example: 15.5, description: 'Discount percentage (0-100)', minimum: 0 })
   @IsNumber()
   @Min(0)
   @IsOptional()
   discount?: number;
 
-  @ApiPropertyOptional({ example: 'A rich and complex fragrance...', description: 'Long detailed description (markdown-like)' })
+  @ApiPropertyOptional({ example: 'Cuero vacuno genuino premium…', description: 'Long detailed description (markdown-like)' })
   @IsString()
   @IsOptional()
   detailDescription?: string;
 
-  @ApiPropertyOptional({ example: '["Long lasting","Versatile"]', description: 'Benefits stored as JSON array of strings' })
+  @ApiPropertyOptional({ example: '["Cuero genuino","Hecho a mano en Ecuador"]', description: 'Benefits stored as JSON array of strings' })
   @IsString()
   @IsOptional()
   benefits?: string;
 
-  // ── PDP editorial ──
-  @ApiPropertyOptional({ description: 'Título del perfil olfativo (ej. "La pirámide de Layton")' })
+  @ApiPropertyOptional({ example: '["Pañalera","Bolso de trabajo"]', description: 'Common uses stored as JSON array of strings (acordeón "Usos comunes")' })
   @IsString()
   @IsOptional()
-  scentProfileTitle?: string;
+  commonUses?: string;
 
-  @ApiPropertyOptional({ type: [ScentSectionDto], description: '3 secciones del perfil olfativo' })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ScentSectionDto)
-  @IsOptional()
-  scentSections?: ScentSectionDto[];
-
-  @ApiPropertyOptional({ description: 'Carácter (valores seleccionados)', type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  mood?: string[];
-
-  @ApiPropertyOptional({ description: 'Ocasión (valores seleccionados)', type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  occasion?: string[];
-
-  @ApiPropertyOptional({ example: 8, description: 'Longevidad 0–10' })
-  @IsNumber()
-  @Min(0)
-  @Max(10)
-  @IsOptional()
-  longevity?: number;
-
-  @ApiPropertyOptional({ example: 7, description: 'Proyección 0–10 (barra PDP)' })
-  @IsNumber()
-  @Min(0)
-  @Max(10)
-  @IsOptional()
-  projectionScore?: number;
-
-  @ApiPropertyOptional({ description: 'Título de la sección "La firma"' })
+  @ApiPropertyOptional({ example: '[3,5]', description: 'IDs de productos "Combina con" (Pairs With) como JSON array de números' })
   @IsString()
   @IsOptional()
-  signatureTitle?: string;
+  pairsWith?: string;
 
-  @ApiPropertyOptional({ description: 'Descripción de la firma' })
+  @ApiPropertyOptional({ example: '["Mini","Midi","Full"]', description: 'Tallas disponibles como JSON array de strings (selector "Talla" de la ficha)' })
   @IsString()
   @IsOptional()
-  signatureDescription?: string;
+  sizes?: string;
 
-  @ApiPropertyOptional({ description: 'URL de la imagen de la firma' })
+  @ApiPropertyOptional({ example: '[{"url":"https://instagram.com/p/…","image":"https://…/post.jpg"}]', description: 'Posts de Instagram de la ficha como JSON array de { url, image }' })
   @IsString()
   @IsOptional()
-  signatureImageUrl?: string;
+  instagramPosts?: string;
 
-  @ApiPropertyOptional({ type: [CreateProductVariantDto], description: 'Variaciones (decants) a crear junto al producto. La botella completa se crea siempre automáticamente.' })
+  @ApiPropertyOptional({ type: [CreateProductVariantDto], description: 'Variaciones (colores, tamaños…) a crear junto al producto.' })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateProductVariantDto)

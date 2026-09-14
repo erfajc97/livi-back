@@ -45,11 +45,8 @@ export class CategoriesService {
     return this.categoriesRepository.save(category);
   }
 
-  async findAllCategories(paginationDto?: PaginationDto, bajoPedido?: boolean): Promise<Category[] | PaginatedResponseDto<Category>> {
+  async findAllCategories(paginationDto?: PaginationDto): Promise<Category[] | PaginatedResponseDto<Category>> {
     const where: any = {};
-    if (bajoPedido !== undefined) {
-      where.bajoPedido = bajoPedido;
-    }
 
     if (paginationDto && (paginationDto.page || paginationDto.limit)) {
       const { page = 1, limit = 20 } = paginationDto;

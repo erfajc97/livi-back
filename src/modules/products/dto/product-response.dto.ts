@@ -1,6 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Gender, TimeOfDay, Concentration, Projection } from '../entities/product.entity';
-import { PresentationType } from '../entities/product-variation.entity';
 import { ProductVariationResponseDto } from './product-variation-response.dto';
 import { orderedGallery, ProductImageResponseDto } from './product-image-response.dto';
 import { ProductVideoResponseDto } from './product-video-response.dto';
@@ -24,35 +22,11 @@ export class ProductResponseDto {
   @ApiProperty({ required: false })
   imageUrl?: string;
 
-  @ApiProperty({ description: 'Sealed bottles in stock' })
+  @ApiProperty({ description: 'Units in stock' })
   stock: number;
-
-  @ApiProperty({ description: 'Total ml per bottle' })
-  totalMl: number;
-
-  @ApiProperty({ description: 'Remaining ml in currently open bottle' })
-  openBottleMlRemaining: number;
-
-  @ApiProperty({ description: 'Total available ml (open bottle + sealed stock)' })
-  availableMl: number;
 
   @ApiProperty()
   isActive: boolean;
-
-  @ApiProperty()
-  bajoPedido: boolean;
-
-  @ApiProperty({ required: false })
-  gender?: Gender;
-
-  @ApiProperty({ required: false })
-  timeOfDay?: TimeOfDay;
-
-  @ApiProperty({ required: false })
-  concentration?: Concentration;
-
-  @ApiProperty({ required: false })
-  projection?: Projection;
 
   @ApiProperty({ required: false })
   discount?: number;
@@ -63,33 +37,17 @@ export class ProductResponseDto {
   @ApiProperty({ required: false })
   benefits?: string;
 
-  // ── PDP editorial ──
   @ApiProperty({ required: false })
-  scentProfileTitle?: string;
+  commonUses?: string;
 
-  @ApiProperty({ required: false })
-  scentSections?: Array<{ title: string; notes: Array<{ name: string; color: string }>; description: string }>;
+  @ApiProperty({ required: false, description: 'JSON array de IDs de productos "Combina con"' })
+  pairsWith?: string;
 
-  @ApiProperty({ required: false })
-  mood?: string[];
+  @ApiProperty({ required: false, description: 'JSON array de tallas disponibles' })
+  sizes?: string;
 
-  @ApiProperty({ required: false })
-  occasion?: string[];
-
-  @ApiProperty({ required: false })
-  longevity?: number;
-
-  @ApiProperty({ required: false })
-  projectionScore?: number;
-
-  @ApiProperty({ required: false })
-  signatureTitle?: string;
-
-  @ApiProperty({ required: false })
-  signatureDescription?: string;
-
-  @ApiProperty({ required: false })
-  signatureImageUrl?: string;
+  @ApiProperty({ required: false, description: 'JSON array de posts de Instagram { url, image }' })
+  instagramPosts?: string;
 
   @ApiProperty()
   salesCount: number;
@@ -100,26 +58,23 @@ export class ProductResponseDto {
   @ApiProperty()
   marcaId: number;
 
-  @ApiProperty({
-    required: false,
-    description: 'Casa del perfume: la ficha la muestra y enlaza a su catálogo',
-  })
+  @ApiProperty({ required: false })
   marca?: { id: number; name: string; slug?: string };
 
-  @ApiProperty({ description: 'Number of active purchasable formats (bottle + decants)' })
+  @ApiProperty({ description: 'Number of active purchasable variations' })
   variationsCount: number;
 
-  @ApiProperty({ description: 'Cheapest active format price' })
+  @ApiProperty({ description: 'Cheapest active variation price' })
   minFormatPrice: number;
 
-  @ApiProperty({ description: 'Most expensive active format price' })
+  @ApiProperty({ description: 'Most expensive active variation price' })
   maxFormatPrice: number;
 
   @ApiProperty({
     required: false,
-    description: 'Compact list of active formats (bottle + decants) for cards',
+    description: 'Compact list of active variations for cards',
   })
-  formats?: { id: number; ml: number; price: number; isFullBottle: boolean; presentationType?: PresentationType; imageUrl?: string }[];
+  formats?: { id: number; name?: string; price: number; imageUrl?: string; colorHex?: string; size?: string }[];
 
   @ApiProperty({ type: [ProductVariationResponseDto], required: false })
   variations?: ProductVariationResponseDto[];
@@ -144,28 +99,14 @@ export class ProductResponseDto {
     this.description = product.description;
     this.imageUrl = product.imageUrl;
     this.stock = product.stock;
-    this.totalMl = Number(product.totalMl || 0);
-    this.openBottleMlRemaining = Number(product.openBottleMlRemaining || 0);
-    this.availableMl =
-      this.openBottleMlRemaining + this.stock * this.totalMl;
     this.isActive = product.isActive;
-    this.bajoPedido = product.bajoPedido;
-    this.gender = product.gender;
-    this.timeOfDay = product.timeOfDay;
-    this.concentration = product.concentration;
-    this.projection = product.projection;
     this.discount = product.discount;
     this.detailDescription = product.detailDescription;
     this.benefits = product.benefits;
-    this.scentProfileTitle = product.scentProfileTitle ?? undefined;
-    this.scentSections = product.scentSections ?? undefined;
-    this.mood = product.mood ?? undefined;
-    this.occasion = product.occasion ?? undefined;
-    this.longevity = product.longevity ?? undefined;
-    this.projectionScore = product.projectionScore ?? undefined;
-    this.signatureTitle = product.signatureTitle ?? undefined;
-    this.signatureDescription = product.signatureDescription ?? undefined;
-    this.signatureImageUrl = product.signatureImageUrl ?? undefined;
+    this.commonUses = product.commonUses;
+    this.pairsWith = product.pairsWith;
+    this.sizes = product.sizes;
+    this.instagramPosts = product.instagramPosts;
     this.salesCount = product.salesCount ?? 0;
     this.categoryId = product.categoryId;
     this.marcaId = product.marcaId;
@@ -176,13 +117,13 @@ export class ProductResponseDto {
           slug: product.marca.slug ?? undefined,
         }
       : undefined;
-    // Conteo de formatos: usa el count del list (loadRelationCountAndMap) o,
-    // en el detalle, la longitud de las variaciones cargadas.
+    // Conteo de variaciones: usa el count del list o, en el detalle, la
+    // longitud de las variaciones cargadas.
     this.variationsCount =
       product.variationsCount ?? (product.variations?.length ?? 0);
-    // Rango de precio de formatos (frasco + decants). En el list viene del
-    // agregado (minFormatPrice/maxFormatPrice); en el detalle se deriva de
-    // las variaciones cargadas; si no hay, cae al precio del producto.
+    // Rango de precio de variaciones. En el list viene del agregado
+    // (minFormatPrice/maxFormatPrice); en el detalle se deriva de las
+    // variaciones cargadas; si no hay, cae al precio del producto.
     const variationPrices = (product.variations ?? [])
       .map((v: any) => Number(v.price))
       .filter((n: number) => !Number.isNaN(n));
@@ -198,8 +139,8 @@ export class ProductResponseDto {
         : variationPrices.length
           ? Math.max(...variationPrices)
           : Number(product.price);
-    // Lista compacta de formatos: del list (product.formats) o derivada de las
-    // variaciones cargadas en el detalle.
+    // Lista compacta de variaciones: del list (product.formats) o derivada de
+    // las variaciones cargadas en el detalle.
     this.formats =
       product.formats ??
       (product.variations?.length
@@ -207,13 +148,11 @@ export class ProductResponseDto {
             const images = orderedGallery(v.images);
             return {
               id: Number(v.id),
-              ml: Number(v.mlSize),
+              name: v.name ?? undefined,
               price: Number(v.price),
-              isFullBottle: !!v.isFullBottle,
-              presentationType:
-                v.presentationType ??
-                (v.isFullBottle ? PresentationType.SELLADA : PresentationType.DECANT),
               imageUrl: images[0]?.url ?? undefined,
+              colorHex: v.colorHex ?? undefined,
+              size: v.size ?? undefined,
             };
           })
         : undefined);
@@ -222,7 +161,7 @@ export class ProductResponseDto {
 
     if (includeVariations && product.variations && product.variations.length > 0) {
       this.variations = product.variations.map(
-        (variation: any) => new ProductVariationResponseDto(variation, this.stock, this.totalMl, this.openBottleMlRemaining),
+        (variation: any) => new ProductVariationResponseDto(variation, this.stock),
       );
     }
 

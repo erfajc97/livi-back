@@ -42,8 +42,4 @@ export class CreateCategoryDto {
   @IsOptional()
   isActive?: boolean;
 
-  @Transform(toBool)
-  @IsBoolean()
-  @IsOptional()
-  bajoPedido?: boolean;
 }

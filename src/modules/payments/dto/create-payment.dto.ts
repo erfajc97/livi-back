@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 class PaymentOrderItemDto {
-  @ApiPropertyOptional({ description: 'Product variation ID (for decants)' })
+  @ApiPropertyOptional({ description: 'Product variation ID' })
   @IsNumber()
   @IsOptional()
   productVariationId?: number;

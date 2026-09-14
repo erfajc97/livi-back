@@ -31,10 +31,6 @@ export class CreateMarcaDto {
   @IsOptional()
   isActive?: boolean;
 
-  @Transform(toBool)
-  @IsBoolean()
-  @IsOptional()
-  bajoPedido?: boolean;
 
   @IsString()
   @IsOptional()

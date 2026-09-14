@@ -5,10 +5,6 @@ export interface OrderEmailItem {
   name: string;
   quantity: number;
   price: number;
-  /** Tamaño en ml cuando la línea es un decant. */
-  ml?: number;
-  /** Unidades de la línea que quedan bajo pedido (se importan). */
-  bajoPedidoQuantity?: number;
 }
 
 /**
@@ -74,9 +70,6 @@ export interface OrderEmailData {
   total: number;
   items: OrderEmailItem[];
 }
-
-/** Texto estándar del sitio para el tiempo de entrega bajo pedido. */
-export const BAJO_PEDIDO_LEAD_TIME = '13–17 días';
 
 /** URL pública de rastreo de Servientrega para una guía. */
 export function servientregaTrackingUrl(trackingCode: string): string {

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { ProductVariation, PresentationType } from './entities/product-variation.entity';
+import { ProductVariation } from './entities/product-variation.entity';
 import { ProductOptionValue } from './entities/product-option-value.entity';
 import { Product } from './entities/product.entity';
 import { CreateProductVariationDto } from './dto/create-product-variation.dto';
@@ -60,28 +60,14 @@ export class ProductVariationsService {
       }
     }
 
-    // El tipo de presentación manda: es lo que el admin eligió en el formulario.
-    // Antes ganaba `isFullBottle` y el panel siempre lo mandaba en false, así que
-    // una variante "sellada" se guardaba como decant y en la ficha salía
-    // bloqueada por falta de ml.
-    const presentationType =
-      createVariationDto.presentationType ??
-      (createVariationDto.isFullBottle
-        ? PresentationType.SELLADA
-        : PresentationType.DECANT);
-    const isFullBottle =
-      createVariationDto.presentationType != null
-        ? presentationType !== PresentationType.DECANT
-        : (createVariationDto.isFullBottle ?? false);
-
     const variation = this.variationsRepository.create({
       productId: createVariationDto.productId,
       price: createVariationDto.price,
-      mlSize: createVariationDto.mlSize,
-      isFullBottle,
-      presentationType,
+      cost: createVariationDto.cost,
       sku: createVariationDto.sku,
       name: createVariationDto.name,
+      colorHex: createVariationDto.colorHex,
+      size: createVariationDto.size,
       isActive: createVariationDto.isActive ?? true,
     });
 
@@ -100,7 +86,7 @@ export class ProductVariationsService {
 
     return variations.map((variation) => {
       const p = (variation as any).product;
-      return new ProductVariationResponseDto(variation, p?.stock, p?.totalMl, p?.openBottleMlRemaining);
+      return new ProductVariationResponseDto(variation, p?.stock);
     });
   }
 
@@ -113,7 +99,7 @@ export class ProductVariationsService {
 
     return variations.map((variation) => {
       const p = (variation as any).product;
-      return new ProductVariationResponseDto(variation, p?.stock, p?.totalMl, p?.openBottleMlRemaining);
+      return new ProductVariationResponseDto(variation, p?.stock);
     });
   }
 
@@ -128,7 +114,7 @@ export class ProductVariationsService {
     }
 
     const p = (variation as any).product;
-    return new ProductVariationResponseDto(variation, p?.stock, p?.totalMl, p?.openBottleMlRemaining);
+    return new ProductVariationResponseDto(variation, p?.stock);
   }
 
   async update(
@@ -162,24 +148,20 @@ export class ProductVariationsService {
     if (updateVariationDto.price !== undefined) {
       variation.price = updateVariationDto.price;
     }
-    if (updateVariationDto.mlSize !== undefined) {
-      variation.mlSize = updateVariationDto.mlSize;
-    }
-    if (updateVariationDto.isFullBottle !== undefined) {
-      variation.isFullBottle = updateVariationDto.isFullBottle;
-    }
-    if (updateVariationDto.presentationType !== undefined) {
-      // El tipo elegido en el panel manda sobre `isFullBottle`: el formulario lo
-      // manda siempre en false y así una "sellada" terminaba guardada como decant.
-      variation.presentationType = updateVariationDto.presentationType;
-      variation.isFullBottle =
-        updateVariationDto.presentationType !== PresentationType.DECANT;
+    if (updateVariationDto.cost !== undefined) {
+      variation.cost = updateVariationDto.cost;
     }
     if (updateVariationDto.sku !== undefined) {
       variation.sku = updateVariationDto.sku;
     }
     if (updateVariationDto.name !== undefined) {
       variation.name = updateVariationDto.name;
+    }
+    if (updateVariationDto.colorHex !== undefined) {
+      variation.colorHex = updateVariationDto.colorHex;
+    }
+    if (updateVariationDto.size !== undefined) {
+      variation.size = updateVariationDto.size;
     }
     if (updateVariationDto.isActive !== undefined) {
       variation.isActive = updateVariationDto.isActive;

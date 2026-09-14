@@ -15,18 +15,18 @@ export function getWelcomeEmailHtml(
 ): string {
   const body = `
     ${paragraph(
-      `Hola <strong style="color:#1C1A17;font-weight:600;">${escapeHtml(firstName || 'Cliente')}</strong>,
-      bienvenido a NonDecants. Tu cuenta ya está lista.`,
+      `Hola <strong style="color:#231815;font-weight:600;">${escapeHtml(firstName || 'Cliente')}</strong>,
+      bienvenido a LIVI. Tu cuenta ya está lista.`,
     )}
     ${paragraph(
-      `Descubre perfumes auténticos al mejor precio: prueba en decant antes de comprometerte
-      con el frasco entero, y si no está en nuestro catálogo, lo conseguimos por ti.`,
+      `Descubre pañaleras y mochilas de cuero premium, hechas a mano en Ecuador:
+      piezas pensadas para tu vida, no solo para la etapa.`,
     )}
-    ${ctaButton('Descubrir perfumes', shopUrl)}
+    ${ctaButton('Descubrir la tienda', shopUrl)}
     ${paragraph(
       `Desde tu cuenta puedes seguir tus pedidos y guardar tus datos para compras más rápidas.`,
     )}
   `;
 
-  return baseEmailLayout('Bienvenido a NonDecants', body);
+  return baseEmailLayout('Bienvenido a LIVI', body);
 }

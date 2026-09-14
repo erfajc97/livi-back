@@ -22,6 +22,7 @@ import { DELIVERY_COSTS } from '../../common/constants/delivery-methods';
 import { CouponsService } from '../coupons/coupons.service';
 import { UsersService } from '../users/users.service';
 import { EmailService } from '../email/email.service';
+import { WalletfyService } from '../walletfy/walletfy.service';
 import { OrderEmailData, OrderEmailItem } from '../email/email.types';
 
 const PAYPHONE_SURCHARGE_RATE = 0.06; // 6%
@@ -45,6 +46,7 @@ export class PaymentsService {
     private couponsService: CouponsService,
     private usersService: UsersService,
     private emailService: EmailService,
+    private walletfyService: WalletfyService,
   ) {}
 
   /**
@@ -83,15 +85,10 @@ export class PaymentsService {
       const product =
         variation?.product ??
         (item.productId ? productById.get(String(item.productId)) : undefined);
-      const ml = variation ? Number(variation.mlSize) : undefined;
       return {
         name: product?.name ?? 'Producto',
         quantity: item.quantity,
         price: Number(item.price),
-        ml: ml && !variation?.isFullBottle ? ml : undefined,
-        bajoPedidoQuantity: item.bajoPedidoQuantity
-          ? Number(item.bajoPedidoQuantity)
-          : undefined,
       };
     });
 
@@ -185,17 +182,13 @@ export class PaymentsService {
     try {
       // Build order items and calculate subtotal
       const orderItems: OrderItem[] = [];
-      // Datos legibles por línea para el correo/WhatsApp (nombre real + ml).
+      // Datos legibles por línea para el correo/WhatsApp (nombre real).
       const notificationItems: {
         name: string;
         quantity: number;
         price: number;
-        ml?: number;
       }[] = [];
       let subtotal = 0;
-      // Demanda de decants acumulada por producto (ml). Tope: el ml físico del
-      // producto (no se importan decants sueltos sin frasco que abrir).
-      const decantDemand = new Map<number, { product: Product; ml: number }>();
 
       for (const item of dto.items) {
         if (item.productVariationId) {
@@ -217,21 +210,6 @@ export class PaymentsService {
             );
           }
 
-          // Frasco completo: SIEMPRE comprable. Si no hay stock sellado, el
-          // excedente se importa bajo pedido (se registra como bajoPedidoQuantity
-          // al descontar stock). Los decants se topan al ml físico del producto:
-          // se acumulan aquí para validar contra el inventario. Si los frascos
-          // del MISMO pedido consumen ese ml, los decants no se rechazan — al
-          // descontar quedan marcados como bajo pedido.
-          if (!variation.isFullBottle) {
-            const ml = Number(variation.mlSize || 0) * item.quantity;
-            const prev = decantDemand.get(variation.product.id);
-            decantDemand.set(variation.product.id, {
-              product: variation.product,
-              ml: (prev?.ml ?? 0) + ml,
-            });
-          }
-
           const price = item.priceOverride ?? Number(variation.price || variation.product.price);
           const itemSubtotal = price * item.quantity;
           subtotal += itemSubtotal;
@@ -248,7 +226,6 @@ export class PaymentsService {
             name: variation.product.name,
             quantity: item.quantity,
             price,
-            ml: Number(variation.mlSize) || undefined,
           });
         } else if (item.productId) {
           // Full bottle purchase — via product directly
@@ -263,10 +240,6 @@ export class PaymentsService {
           if (!product.isActive) {
             throw new BadRequestException(`Product ${item.productId} is not active`);
           }
-
-          // Frasco completo directo: SIEMPRE comprable. Sin stock sellado, el
-          // excedente se importa bajo pedido (se registra como bajoPedidoQuantity
-          // al descontar stock). Sin tope duro.
 
           const price = item.priceOverride ?? Number(product.price);
           const itemSubtotal = price * item.quantity;
@@ -283,21 +256,7 @@ export class PaymentsService {
             name: product.name,
             quantity: item.quantity,
             price,
-            ml: Number(product.totalMl) || undefined,
           });
-        }
-      }
-
-      // Validar decants: nunca permitir más ml de los que existen físicamente.
-      // (Los frascos del mismo pedido no restan aquí: si se llevan el stock, el
-      // descuento marca esos decants como bajo pedido en vez de rechazarlos.)
-      for (const { product: p, ml } of decantDemand.values()) {
-        const availableMl = this.stockService.getAvailableMl(p);
-        if (availableMl < ml) {
-          throw new BadRequestException(
-            `No hay suficiente stock para preparar los decants de "${p.name}". ` +
-              `Disponible: ${availableMl} ml, solicitado: ${ml} ml.`,
-          );
         }
       }
 
@@ -492,67 +451,22 @@ export class PaymentsService {
     const now = new Date();
     const pendingItems = order.items.filter((i) => !i.stockDeductedAt);
 
-    // Resolver las variaciones una sola vez: hace falta saber cuáles son
-    // decants ANTES de descontar para poder ordenar el descuento.
-    const variations = new Map<number, ProductVariation>();
     for (const item of pendingItems) {
-      if (item.productVariationId && !variations.has(item.productVariationId)) {
-        const v = await this.variationsRepository.findOne({
+      let product: Product | null = null;
+      if (item.productVariationId) {
+        const variation = await this.variationsRepository.findOne({
           where: { id: item.productVariationId },
           relations: ['product'],
         });
-        if (v) variations.set(item.productVariationId, v);
-      }
-    }
-
-    // Los frascos sellados tienen prioridad sobre los decants: si el pedido
-    // lleva ambos del mismo producto, las botellas consumen el stock y los ml
-    // que ya no alcanzan quedan como bajoPedidoQuantity en los decants.
-    const isDecant = (item: OrderItem) => {
-      const v = item.productVariationId ? variations.get(item.productVariationId) : null;
-      return v ? !v.isFullBottle : false;
-    };
-    const ordered = [...pendingItems].sort(
-      (a, b) => Number(isDecant(a)) - Number(isDecant(b)),
-    );
-
-    for (const item of ordered) {
-      if (item.productVariationId) {
-        const variation = variations.get(item.productVariationId);
-
-        if (!variation || !variation.product) continue;
-
-        if (variation.isFullBottle) {
-          const result = await this.stockService.deductFullBottleStock(
-            variation.product,
-            item.quantity,
-            queryRunner,
-          );
-          item.bajoPedidoQuantity = result.pendingQuantity;
-        } else {
-          const result = await this.stockService.deductDecantStock(
-            variation.product,
-            Number(variation.mlSize),
-            item.quantity,
-            queryRunner,
-          );
-          item.mlDeducted = result.mlDeducted;
-          item.bottlesOpened = result.bottlesOpened;
-          item.bajoPedidoQuantity = result.pendingQuantity;
-        }
+        product = variation?.product ?? null;
       } else if (item.productId) {
-        const product = await this.productsRepository.findOne({
+        product = await this.productsRepository.findOne({
           where: { id: item.productId },
         });
+      }
 
-        if (product) {
-          const result = await this.stockService.deductFullBottleStock(
-            product,
-            item.quantity,
-            queryRunner,
-          );
-          item.bajoPedidoQuantity = result.pendingQuantity;
-        }
+      if (product) {
+        await this.stockService.deductStock(product, item.quantity, queryRunner);
       }
       item.stockDeductedAt = now;
       await queryRunner.manager.save(OrderItem, item);
@@ -656,6 +570,21 @@ export class PaymentsService {
           console.error('[Payments] M-01 confirmación falló:', err?.message),
         );
 
+      // Walletfy · tarjeta de fidelidad: crea/encuentra al cliente y le suma
+      // el sello de la compra. Fire-and-forget — nunca tumba la respuesta, y
+      // el corte por idempotencia de arriba evita duplicados (además Walletfy
+      // tiene cooldown propio de 6h por cliente).
+      this.walletfyService
+        .rewardOrder({
+          name: order.customerName ?? '',
+          email: order.customerEmail,
+          phone: order.customerPhone,
+          total: Number(order.total),
+        })
+        .catch((err) =>
+          console.error('[Payments] Walletfy falló:', err?.message),
+        );
+
       // M-13 · Aviso al admin, aquí y no al crear la orden: con tarjeta esta es
       // la primera señal de que el dinero entró de verdad.
       this.buildOrderEmailData(order)
@@ -674,7 +603,6 @@ export class PaymentsService {
               name: i.name,
               quantity: i.quantity,
               price: i.price,
-              ml: i.ml,
             })),
           }),
         )

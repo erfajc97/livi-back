@@ -9,7 +9,6 @@ import { ProductImage } from '../modules/products/entities/product-image.entity'
 import { ProductVideo } from '../modules/products/entities/product-video.entity';
 import { ProductVariationImage } from '../modules/products/entities/product-variation-image.entity';
 import { ProductVariationVideo } from '../modules/products/entities/product-variation-video.entity';
-import { BottleEvent } from '../modules/products/entities/bottle-event.entity';
 import { Category } from '../modules/categories/entities/category.entity';
 import { Marca } from '../modules/categories/entities/marca.entity';
 import { Order } from '../modules/orders/entities/order.entity';
@@ -43,7 +42,6 @@ export const entities = [
   ProductVideo,
   ProductVariationImage,
   ProductVariationVideo,
-  BottleEvent,
   Category,
   Marca,
   Cart,

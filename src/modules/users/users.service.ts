@@ -332,6 +332,17 @@ export class UsersService {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
+    // Cambio de correo: debe seguir siendo único — sin este chequeo la
+    // restricción UNIQUE de la tabla respondería un 500 poco claro.
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const taken = await this.usersRepository.findOne({
+        where: { email: updateUserDto.email },
+      });
+      if (taken) {
+        throw new ConflictException('Ese correo ya está registrado en otra cuenta.');
+      }
+    }
+
     Object.assign(user, updateUserDto);
     const updatedUser = await this.usersRepository.save(user);
     return new UserResponseDto(updatedUser);
