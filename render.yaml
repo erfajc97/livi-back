@@ -26,6 +26,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "22"
 
       # ── Base de datos (Render PostgreSQL) ──
       - key: DB_HOST
@@ -43,6 +45,8 @@ services:
       - key: DB_SYNCHRONIZE
         value: "true" # primera carga: crea el esquema. Luego pasar a false y usar migraciones
       - key: DB_MIGRATIONS_RUN
+        value: "false"
+      - key: DB_LOGGING
         value: "false"
 
       # ── Auth ──
@@ -79,15 +83,31 @@ services:
         sync: false # URL pública del logo en Cloudinary, ej: https://res.cloudinary.com/<cloud>/image/upload/livi/branding/logo-livi.png
 
       # ── Pasarela de pago (PayPhone) ──
+      - key: PAYPHONE_API_URL
+        value: https://pay.payphonetodoesposible.com/api
       - key: PAYPHONE_TOKEN
         sync: false
       - key: PAYPHONE_STORE_ID
+        sync: false
+      - key: PAYPHONE_RESPONSE_URL
+        sync: false # ej: https://livi-web.onrender.com/orden/confirmacion
+      - key: PAYPHONE_CANCELLATION_URL
+        sync: false # ej: https://livi-web.onrender.com/checkout?cancelled=true
+
+      # ── Walletfy (tarjetas de fidelidad, opcional) ──
+      - key: WALLETFY_API_KEY
         sync: false
 
       # ── Contacto admin (correos de notificación de pedidos) ──
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_WHATSAPP
+        sync: false
+      # Primer admin del panel: se crea al arrancar si no existe ninguno.
+      # Borrar ambas tras el primer deploy exitoso.
+      - key: ADMIN_SEED_EMAIL
+        sync: false
+      - key: ADMIN_SEED_PASSWORD
         sync: false
 
       # ── Google OAuth (opcional — login con Google) ──

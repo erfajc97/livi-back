@@ -22,7 +22,7 @@ export async function runSeeders() {
     entities: entities, // Use centralized entities to avoid Node.js experimental TypeScript issues
     synchronize: false,
     logging: process.env.DB_LOGGING === 'true',
-    ssl: process.env.DB_SSL === 'true',
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   };
 
   const dataSource = new DataSource(dataSourceOptions);

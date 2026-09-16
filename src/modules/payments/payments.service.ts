@@ -116,7 +116,7 @@ export class PaymentsService {
     const random = Math.floor(Math.random() * 1000000)
       .toString()
       .padStart(6, '0');
-    return `ND-${year}-${random}`;
+    return `LIVI-${year}-${random}`;
   }
 
   /**

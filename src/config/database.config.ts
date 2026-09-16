@@ -48,7 +48,11 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       // base que ya tiene `users`, el proceso muere al boot y todo da 500.
       migrationsRun: envFlag(this.configService.get('DB_MIGRATIONS_RUN'), false),
       logging: envFlag(this.configService.get('DB_LOGGING'), false),
-      ssl: envFlag(this.configService.get('DB_SSL'), false),
+      // Postgres gestionado (Render) exige SSL con certificado que node no
+      // siempre valida: se cifra la conexión sin verificar la CA.
+      ssl: envFlag(this.configService.get('DB_SSL'), false)
+        ? { rejectUnauthorized: false }
+        : false,
     };
   }
 }

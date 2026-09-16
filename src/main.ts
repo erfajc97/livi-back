@@ -18,6 +18,11 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
+  // Render (y cualquier PaaS) pone un proxy delante: sin trust proxy todas las
+  // requests llegan con la IP del proxy y el throttler global (20 req/min por
+  // IP) bloquea a TODOS los clientes a la vez.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Swagger/OpenAPI configuration
   const config = new DocumentBuilder()
     .setTitle('E-commerce API')

@@ -59,9 +59,13 @@ export class OrdersService {
   private buildOrderEmailData(order: Order): OrderEmailData {
     const items: OrderEmailItem[] = (order.items ?? []).map((item) => {
       const variation = item.productVariation;
-      const name = item.product?.name ?? variation?.product?.name ?? 'Producto';
+      const baseName = item.product?.name ?? variation?.product?.name ?? 'Producto';
+      // La variante comprada (color + talla) va en el nombre del ítem:
+      // "Olivia Maxi Tote — Espresso · Midi". Sin esto el correo decía solo
+      // el producto y el cliente no veía qué color/talla pidió.
+      const variantDetail = [variation?.name, variation?.size].filter(Boolean).join(' · ');
       return {
-        name,
+        name: variantDetail ? `${baseName} — ${variantDetail}` : baseName,
         quantity: item.quantity,
         price: Number(item.price),
       };
@@ -206,7 +210,7 @@ export class OrdersService {
   private generateOrderNumber(): string {
     const year = new Date().getFullYear();
     const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-    return `ORD-${year}-${random}`;
+    return `LIVI-${year}-${random}`;
   }
 
   /**

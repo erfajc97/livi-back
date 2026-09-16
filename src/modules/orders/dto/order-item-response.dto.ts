@@ -31,6 +31,12 @@ export class OrderItemResponseDto {
   @ApiPropertyOptional({ description: 'Variation name (color, tamaño…)' })
   variationName?: string;
 
+  @ApiPropertyOptional({ example: 'Midi', description: 'Talla de la variación comprada' })
+  variationSize?: string;
+
+  @ApiPropertyOptional({ example: '#5C3A21', description: 'Color hex de la variación comprada' })
+  variationColorHex?: string;
+
   @ApiPropertyOptional({ description: 'Product image URL' })
   productImage?: string;
 
@@ -51,6 +57,8 @@ export class OrderItemResponseDto {
     }
     if (item.productVariation) {
       this.variationName = item.productVariation.name ?? undefined;
+      this.variationSize = item.productVariation.size ?? undefined;
+      this.variationColorHex = item.productVariation.colorHex ?? undefined;
       // Use variation image if available, fallback to product image
       const variationImg = item.productVariation.images?.[0]?.url;
       if (variationImg) {

@@ -33,7 +33,7 @@ export class NewsletterService {
     }
     this.fromEmail =
       this.configService.get<string>('MAIL_FROM_EMAIL') || 'noreply@livi.ec';
-    this.fromName = this.configService.get<string>('MAIL_FROM_NAME') || 'NonDecants';
+    this.fromName = this.configService.get<string>('MAIL_FROM_NAME') || 'LIVI';
     // FRONTEND_URL puede traer varios orígenes (lista de CORS): para los
     // enlaces del correo vale el primero.
     this.frontendUrl =
