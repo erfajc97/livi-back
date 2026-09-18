@@ -28,7 +28,12 @@ export class CloudinaryService {
     const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY', '');
     const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET', '');
 
-    this.configured = Boolean(cloudName && apiKey && apiSecret);
+    // Un placeholder tipo CAMBIAR_... no es una credencial: sin este filtro
+    // Cloudinary respondía 401 y la subida fallaba con un mensaje opaco.
+    const isPlaceholder = (v: string) => /^(cambiar|pegar|tu_|your_|xxx)/i.test(v.trim());
+    const complete = Boolean(cloudName && apiKey && apiSecret);
+    this.configured =
+      complete && ![cloudName, apiKey, apiSecret].some(isPlaceholder);
     this.rootFolder = this.configService.get<string>('CLOUDINARY_FOLDER', 'livi');
 
     if (this.configured) {
@@ -42,7 +47,7 @@ export class CloudinaryService {
       // No lanzamos error: permite levantar la API en local sin cuenta aún.
       // Fallará solo cuando se intente subir/borrar un archivo.
       this.logger.warn(
-        'Cloudinary NO configurado (faltan CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET). ' +
+        `Cloudinary NO configurado (${complete ? 'las credenciales siguen siendo valores de ejemplo' : 'faltan CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET'}). ` +
           'Las subidas de archivos fallarán hasta completar las credenciales.',
       );
     }
@@ -133,7 +138,7 @@ export class CloudinaryService {
   private assertConfigured(): void {
     if (!this.configured) {
       throw new BadRequestException(
-        'Cloudinary no está configurado. Define CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en el .env',
+        'Cloudinary no está configurado: revisa CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET (no pueden quedar con los valores de ejemplo CAMBIAR_...)',
       );
     }
   }

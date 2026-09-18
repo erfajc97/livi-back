@@ -69,7 +69,7 @@ export class PayPhoneService {
     // Match exact working PayPhone Prepare payload (from anko project)
     const payload = {
       clientTransactionId: dto.clientTransactionId,
-      reference: dto.reference || 'Orden NönDecants',
+      reference: dto.reference || 'Orden LIVI',
       amount: amountInCents,
       amountWithoutTax: amountInCents,
       responseUrl: this.responseUrl,
