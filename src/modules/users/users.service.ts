@@ -50,6 +50,7 @@ export class UsersService {
     password: string;
     firstName: string;
     lastName: string;
+    phone?: string;
   }): Promise<User> {
     const existingUser = await this.usersRepository.findOne({
       where: { email: data.email },
@@ -66,6 +67,7 @@ export class UsersService {
       password: hashedPassword,
       firstName: data.firstName,
       lastName: data.lastName,
+      phone: data.phone,
       role: Role.CLIENT,
       isEmailVerified: false,
       authProvider: 'local',

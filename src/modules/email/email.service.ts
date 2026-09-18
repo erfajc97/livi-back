@@ -24,6 +24,10 @@ import {
   ShipmentKind,
 } from './templates/order-shipped-email';
 import { getOrderDeliveredEmailHtml } from './templates/order-delivered-email';
+import {
+  getOrderCancelledEmailHtml,
+  getOrderDelayedEmailHtml,
+} from './templates/order-status-emails';
 import { getAbandonedCartEmailHtml } from './templates/abandoned-cart-email';
 import { getWelcomeEmailHtml } from './templates/welcome-email';
 import { getAdminNewOrderEmailHtml } from './templates/admin-new-order-email';
@@ -280,6 +284,26 @@ export class EmailService {
       subject,
       getOrderShippedEmailHtml(data, trackingCode, kind),
       `Guía de despacho (M-05, ${kind})`,
+    );
+  }
+
+  /** M-11 · Pedido cancelado por el admin o por el cliente. */
+  async sendOrderCancelledEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      data.customerEmail,
+      `Pedido cancelado ${data.orderNumber} — LIVI`,
+      getOrderCancelledEmailHtml(data),
+      'Pedido cancelado (M-11)',
+    );
+  }
+
+  /** M-12 · Pedido retrasado. */
+  async sendOrderDelayedEmail(data: OrderEmailData): Promise<void> {
+    await this.send(
+      data.customerEmail,
+      `Tu pedido ${data.orderNumber} va con retraso — LIVI`,
+      getOrderDelayedEmailHtml(data),
+      'Pedido retrasado (M-12)',
     );
   }
 

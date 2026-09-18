@@ -99,6 +99,7 @@ export class AuthService {
       password: registerDto.password,
       firstName: registerDto.firstName,
       lastName: registerDto.lastName,
+      phone: registerDto.phone,
     });
 
     const token = await this.usersService.setVerificationToken(user.id);

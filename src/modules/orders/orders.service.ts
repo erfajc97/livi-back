@@ -136,6 +136,17 @@ export class OrdersService {
         .catch(fail('M-05/06/07'));
     }
 
+    if (
+      order.status === OrderStatus.SHIPPED &&
+      !order.trackingCode &&
+      statusChanged
+    ) {
+      console.log(
+        `[Orders] ${order.orderNumber}: pasó a "Enviado" sin código de guía, ` +
+          'no se envió el correo de despacho (M-05). Guarda la guía para dispararlo.',
+      );
+    }
+
     if (!statusChanged) return;
 
     switch (order.status) {
@@ -163,7 +174,22 @@ export class OrdersService {
           .catch(fail('M-08'));
         break;
 
+      // M-11 · cancelado y M-12 · retrasado. Antes ambos estados cambiaban en
+      // el panel sin avisar nunca al cliente.
+      case OrderStatus.CANCELLED:
+        this.emailService.sendOrderCancelledEmail(data).catch(fail('M-11'));
+        break;
+
+      case OrderStatus.DELAYED:
+        this.emailService.sendOrderDelayedEmail(data).catch(fail('M-12'));
+        break;
+
       default:
+        // Deja rastro de por qué un cambio de estado no generó correo: sin
+        // esto la única pista era "no llegó nada".
+        console.log(
+          `[Orders] ${order.orderNumber}: estado ${order.status} sin correo asociado`,
+        );
         break;
     }
   }
