@@ -68,6 +68,7 @@ export class CloudinaryService {
       );
     }
     this.assertConfigured();
+    this.assertSizeAllowed(file);
 
     const extension = file.originalname.split('.').pop()?.toLowerCase() || 'bin';
     const publicId = `${this.rootFolder}/${folder}/${uuidv4()}`;
@@ -133,6 +134,23 @@ export class CloudinaryService {
   async deleteFiles(keys: string[]): Promise<void> {
     if (!keys || keys.length === 0) return;
     await Promise.all(keys.map((key) => this.deleteFile(key)));
+  }
+
+  /**
+   * Cloudinary (plan free) rechaza imágenes/raw de más de 10 MB y videos de
+   * más de 100 MB con un "File size too large" poco claro. Se corta antes,
+   * con el peso real en el mensaje, para que el panel pueda mostrarlo.
+   */
+  private assertSizeAllowed(file: Express.Multer.File): void {
+    const isVideo = file.mimetype?.startsWith('video/');
+    const limitBytes = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size <= limitBytes) return;
+
+    const toMb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
+    throw new BadRequestException(
+      `El archivo pesa ${toMb(file.size)} MB y el máximo permitido es ${toMb(limitBytes)} MB. ` +
+        'Reduce el peso de la imagen antes de subirla.',
+    );
   }
 
   private assertConfigured(): void {
