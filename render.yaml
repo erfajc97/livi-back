@@ -30,16 +30,9 @@ services:
         value: "22"
 
       # ── Base de datos (Render PostgreSQL) ──
-      - key: DB_HOST
-        fromDatabase: { name: livi-db, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: livi-db, property: port }
-      - key: DB_USERNAME
-        fromDatabase: { name: livi-db, property: user }
-      - key: DB_PASSWORD
-        fromDatabase: { name: livi-db, property: password }
-      - key: DB_NAME
-        fromDatabase: { name: livi-db, property: database }
+      # Una sola URL: evita copiar la contraseña a mano.
+      - key: DATABASE_URL
+        fromDatabase: { name: livi-db, property: connectionString }
       - key: DB_SSL
         value: "true" # Postgres de Render exige SSL
       - key: DB_SYNCHRONIZE

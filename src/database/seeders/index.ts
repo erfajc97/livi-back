@@ -12,13 +12,19 @@ export const seeders = [
 
 export async function runSeeders() {
   // Create a fresh DataSource with current environment variables
+  const connection = process.env.DATABASE_URL
+    ? { url: process.env.DATABASE_URL }
+    : {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        username: process.env.DB_USERNAME || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres',
+        database: process.env.DB_NAME || 'ecommerce',
+      };
+
   const dataSourceOptions: DataSourceOptions = {
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_NAME || 'ecommerce',
+    ...connection,
     entities: entities, // Use centralized entities to avoid Node.js experimental TypeScript issues
     synchronize: false,
     logging: process.env.DB_LOGGING === 'true',

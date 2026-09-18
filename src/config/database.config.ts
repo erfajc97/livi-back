@@ -33,6 +33,30 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       } as TypeOrmModuleOptions;
     }
 
+    // Postgres gestionado (Render/Neon/Supabase) entrega una sola URL de
+    // conexión: si está, manda sobre las DB_* sueltas. Así el dashboard puede
+    // inyectar la credencial completa sin copiarla a mano.
+    const databaseUrl = this.configService.get<string>('DATABASE_URL');
+    const ssl = envFlag(this.configService.get('DB_SSL'), false)
+      ? { rejectUnauthorized: false }
+      : false;
+
+    if (databaseUrl) {
+      return {
+        type: 'postgres',
+        url: databaseUrl,
+        entities,
+        migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
+        synchronize: envFlag(this.configService.get('DB_SYNCHRONIZE'), false),
+        migrationsRun: envFlag(
+          this.configService.get('DB_MIGRATIONS_RUN'),
+          false,
+        ),
+        logging: envFlag(this.configService.get('DB_LOGGING'), false),
+        ssl,
+      };
+    }
+
     return {
       type: 'postgres',
       host: this.configService.get<string>('DB_HOST', 'localhost'),
@@ -50,9 +74,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       logging: envFlag(this.configService.get('DB_LOGGING'), false),
       // Postgres gestionado (Render) exige SSL con certificado que node no
       // siempre valida: se cifra la conexión sin verificar la CA.
-      ssl: envFlag(this.configService.get('DB_SSL'), false)
-        ? { rejectUnauthorized: false }
-        : false,
+      ssl,
     };
   }
 }
