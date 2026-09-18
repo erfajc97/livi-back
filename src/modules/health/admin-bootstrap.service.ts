@@ -25,6 +25,15 @@ export class AdminBootstrapService implements OnModuleInit {
     const password = this.configService.get<string>('ADMIN_SEED_PASSWORD');
     if (!email || !password) return;
 
+    // Un placeholder tipo CAMBIAR_email_admin_panel creaba un usuario que
+    // después no podía ni iniciar sesión (el login exige email válido).
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.logger.warn(
+        `ADMIN_SEED_EMAIL no es un email válido ("${email}"): no se crea el admin inicial.`,
+      );
+      return;
+    }
+
     try {
       const users = this.dataSource.getRepository(User);
       // Upsert por email (no "existe algún admin"): si el primer arranque se
