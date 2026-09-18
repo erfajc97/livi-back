@@ -27,8 +27,13 @@ export class AdminBootstrapService implements OnModuleInit {
 
     try {
       const users = this.dataSource.getRepository(User);
-      const existingAdmin = await users.findOne({ where: { role: Role.ADMIN } });
-      if (existingAdmin) return;
+      // Upsert por email (no "existe algún admin"): si el primer arranque se
+      // hizo con un valor de prueba, cambiar la variable crea el admin real
+      // en lugar de quedarse bloqueado con el usuario equivocado.
+      const existing = await users.findOne({
+        where: { email: email.toLowerCase() },
+      });
+      if (existing) return;
 
       await users.save({
         email: email.toLowerCase(),
