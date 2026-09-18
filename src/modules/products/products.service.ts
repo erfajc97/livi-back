@@ -207,6 +207,19 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
+    // El listado ya filtraba variantes activas; el detalle no, y la ficha
+    // mostraba colores/tallas dados de baja. Se ordena para que el selector
+    // salga siempre igual.
+    if (includeVariations && product.variations) {
+      product.variations = product.variations
+        .filter((variation) => variation.isActive)
+        .sort(
+          (a, b) =>
+            (a.name ?? '').localeCompare(b.name ?? '') ||
+            (a.size ?? '').localeCompare(b.size ?? ''),
+        );
+    }
+
     return new ProductResponseDto(product, includeVariations);
   }
 

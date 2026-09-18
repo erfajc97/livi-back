@@ -8,6 +8,22 @@ import { CreateProductVariationDto } from './dto/create-product-variation.dto';
 import { UpdateProductVariationDto } from './dto/update-product-variation.dto';
 import { ProductVariationResponseDto } from './dto/product-variation-response.dto';
 
+
+/**
+ * Color y talla se guardan como texto libre, así que "X", "x" y "X " creaban
+ * variantes distintas y la ficha pintaba el mismo botón de talla dos veces.
+ * Se normaliza el espacio y se compara sin distinguir mayúsculas.
+ */
+function normalizeLabel(value?: string | null): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const clean = value.replace(/\s+/g, ' ').trim();
+  return clean.length > 0 ? clean : undefined;
+}
+
+function sameLabel(a?: string | null, b?: string | null): boolean {
+  return (a ?? '').trim().toLocaleLowerCase() === (b ?? '').trim().toLocaleLowerCase();
+}
+
 @Injectable()
 export class ProductVariationsService {
   constructor(
@@ -60,14 +76,31 @@ export class ProductVariationsService {
       }
     }
 
+    const name = normalizeLabel(createVariationDto.name);
+    const size = normalizeLabel(createVariationDto.size);
+
+    // Unicidad real de la variante: (producto, color, talla). El guard de
+    // optionValues no cubría este camino, que es el que usa el panel.
+    const siblings = await this.variationsRepository.find({
+      where: { productId: createVariationDto.productId },
+    });
+    const clash = siblings.find(
+      (v) => sameLabel(v.name, name) && sameLabel(v.size, size),
+    );
+    if (clash) {
+      throw new ConflictException(
+        `Ya existe la variante "${name ?? 'sin color'}"${size ? ` · talla ${size}` : ''} para este producto`,
+      );
+    }
+
     const variation = this.variationsRepository.create({
       productId: createVariationDto.productId,
       price: createVariationDto.price,
       cost: createVariationDto.cost,
       sku: createVariationDto.sku,
-      name: createVariationDto.name,
+      name,
       colorHex: createVariationDto.colorHex,
-      size: createVariationDto.size,
+      size,
       isActive: createVariationDto.isActive ?? true,
     });
 
@@ -155,13 +188,13 @@ export class ProductVariationsService {
       variation.sku = updateVariationDto.sku;
     }
     if (updateVariationDto.name !== undefined) {
-      variation.name = updateVariationDto.name;
+      variation.name = normalizeLabel(updateVariationDto.name) as string;
     }
     if (updateVariationDto.colorHex !== undefined) {
       variation.colorHex = updateVariationDto.colorHex;
     }
     if (updateVariationDto.size !== undefined) {
-      variation.size = updateVariationDto.size;
+      variation.size = normalizeLabel(updateVariationDto.size) as string;
     }
     if (updateVariationDto.isActive !== undefined) {
       variation.isActive = updateVariationDto.isActive;
