@@ -42,7 +42,26 @@ export class AdminBootstrapService implements OnModuleInit {
       const existing = await users.findOne({
         where: { email: email.toLowerCase() },
       });
-      if (existing) return;
+
+      if (existing) {
+        // Con ADMIN_SEED_RESET=true se reescribe la contraseña del admin ya
+        // creado: sin esto, cambiar ADMIN_SEED_PASSWORD no servía de nada y
+        // quedarse fuera del panel obligaba a tocar la base a mano.
+        const reset =
+          this.configService.get<string>('ADMIN_SEED_RESET')?.trim() === 'true';
+        if (!reset) return;
+
+        existing.password = await bcrypt.hash(password, 10);
+        existing.role = Role.ADMIN;
+        existing.isActive = true;
+        existing.isEmailVerified = true;
+        await users.save(existing);
+        this.logger.warn(
+          `Contraseña del admin ${email} restablecida por ADMIN_SEED_RESET. ` +
+            'Borra esa variable para que no vuelva a aplicarse en cada arranque.',
+        );
+        return;
+      }
 
       await users.save({
         email: email.toLowerCase(),
