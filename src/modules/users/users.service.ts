@@ -21,7 +21,13 @@ export class UsersService {
     private usersRepository: Repository<User>,
   ) {}
 
+  /** El correo identifica a la cuenta: se guarda y se compara en minúsculas. */
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
   async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
+    createUserDto.email = this.normalizeEmail(createUserDto.email);
     const existingUser = await this.usersRepository.findOne({
       where: { email: createUserDto.email },
     });
@@ -52,6 +58,7 @@ export class UsersService {
     lastName: string;
     phone?: string;
   }): Promise<User> {
+    data.email = this.normalizeEmail(data.email);
     const existingUser = await this.usersRepository.findOne({
       where: { email: data.email },
     });
@@ -184,7 +191,7 @@ export class UsersService {
     | { outcome: 'google'; user: User }
     | { outcome: 'not_found' }
   > {
-    const user = await this.usersRepository.findOne({ where: { email } });
+    const user = await this.findByEmail(email);
 
     if (!user) return { outcome: 'not_found' };
     if (user.authProvider === 'google') return { outcome: 'google', user };
@@ -316,8 +323,16 @@ export class UsersService {
     return new UserResponseDto(user);
   }
 
+  /**
+   * Búsqueda por email sin distinguir mayúsculas: el correo se guarda en
+   * minúsculas, así que escribir "Nombre@gmail.com" en el login no encontraba
+   * al usuario y devolvía "Invalid credentials" como si la clave estuviera mal.
+   */
   async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { email } });
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.email) = LOWER(:email)', { email: email.trim() })
+      .getOne();
   }
 
   async update(
