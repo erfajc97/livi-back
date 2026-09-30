@@ -12,13 +12,13 @@ databases:
   - name: livi-db
     databaseName: livi
     user: livi
-    plan: free # upgrade a starter cuando haya tráfico real (free expira a los 30 días)
+    plan: basic-256mb # de pago: el plan free se borra a los 30 días
 
 services:
   - type: web
     name: livi-api
     runtime: node
-    plan: free # el plan free "duerme" tras inactividad; subir a starter en prod
+    plan: starter # el free duerme tras 15 min; producción corre en starter
     buildCommand: npm install && npm run build
     startCommand: node dist/main.js
     healthCheckPath: /api/health
