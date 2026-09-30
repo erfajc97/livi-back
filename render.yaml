@@ -6,7 +6,7 @@
 # el blueprint (secretos que no van en el repo).
 #
 # Dominio: cuando compren el dominio, agregar en Render → livi-api → Settings →
-# Custom Domain (ej. api.livi.ec) y actualizar FRONTEND_URL / CORS_ORIGINS.
+# Custom Domain (ej. api.liviec.com) y actualizar FRONTEND_URL / CORS_ORIGINS.
 
 databases:
   - name: livi-db
@@ -69,7 +69,7 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: MAIL_FROM_EMAIL
-        sync: false # ej: noreply@livi.ec (requiere dominio verificado en Resend)
+        sync: false # ej: noreply@liviec.com (requiere dominio verificado en Resend)
       - key: MAIL_FROM_NAME
         value: LIVI
       - key: MAIL_LOGO_URL

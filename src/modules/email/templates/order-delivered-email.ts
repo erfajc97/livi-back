@@ -21,8 +21,8 @@ export function getOrderDeliveredEmailHtml(customerName: string): string {
     ${paragraph(`Esperamos que tu pieza LIVI te encuentre en el momento justo.`)}
     ${paragraph(
       `Si algo no fue como esperabas, escríbenos por WhatsApp
-      (<a href="https://wa.me/593992305463" style="color:#231815;text-decoration:underline;">0992305463</a>)
-      o a <a href="mailto:contacto@livi.ec" style="color:#231815;text-decoration:underline;">contacto@livi.ec</a>
+      (<a href="https://wa.me/593959010268" style="color:#231815;text-decoration:underline;">0959010268</a>)
+      o a <a href="mailto:contacto@liviec.com" style="color:#231815;text-decoration:underline;">contacto@liviec.com</a>
       — estamos para ti.`,
     )}
     <p style="margin:26px 0 0;font-size:17px;line-height:1.6;color:#231815;font-family:Georgia,serif;font-style:italic;">

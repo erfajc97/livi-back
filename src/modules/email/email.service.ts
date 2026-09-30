@@ -57,7 +57,7 @@ export class EmailService {
     // en Resend (SPF + DKIM) o los envíos se rechazan.
     this.fromEmail =
       this.configService.get<string>('MAIL_FROM_EMAIL') ||
-      'noreply@livi.ec';
+      'noreply@liviec.com';
     this.fromName =
       this.configService.get<string>('MAIL_FROM_NAME') || BRAND_NAME;
     // FRONTEND_URL también alimenta la lista de CORS y puede venir con varios

@@ -89,22 +89,19 @@ async function bootstrap() {
     next();
   });
 
-  // CORS: en producción se permiten los dominios propios (livi.ec y
+  // CORS: en producción se permiten los dominios propios (liviec.com y
   // subdominios) más los orígenes de FRONTEND_URL + CORS_ORIGINS (separados
   // por coma); en desarrollo se permite cualquier origen.
-  //
-  // La landing de staging todavía no tiene dominio y se sirve por IP: sin este
-  // origen el navegador bloqueaba TODAS las llamadas a la API y la home salía
-  // sin banners, sin secciones y sin blog. Quitar en cuanto exista el DNS.
-  const STAGING_LANDING_ORIGIN = 'http://13.59.237.74';
   const allowedOrigins = [
     ...(process.env.FRONTEND_URL?.split(',') ?? []),
     ...(process.env.CORS_ORIGINS?.split(',') ?? []),
-    STAGING_LANDING_ORIGIN,
   ]
     .map((o) => o.trim().replace(/\/+$/, ''))
     .filter(Boolean);
-  const ownDomainRegex = /^https:\/\/([a-z0-9-]+\.)*livi\.ec$/i;
+  // Dominio real: liviec.com. Se deja livi.ec por si algún enlace viejo sigue
+  // apuntando al dominio anterior.
+  const ownDomainRegex =
+    /^https:\/\/([a-z0-9-]+\.)*(liviec\.com|livi\.ec)$/i;
   app.enableCors({
     origin: isProd
       ? (origin, callback) => {

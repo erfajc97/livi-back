@@ -19,16 +19,16 @@ import * as path from 'path';
  * tablas en vez de flex/grid, estilos en línea (Gmail descarta el <style>),
  * ancho fijo de 600 px y colores en hex de seis dígitos.
  *
- * Todo correo al cliente lleva pie con WhatsApp 0992305463 y
+ * Todo correo al cliente lleva pie con WhatsApp 0959010268 y
  * contacto de LIVI (regla de la matriz de mailing).
  */
 
 export const BRAND_NAME = 'LIVI';
-export const BRAND_WHATSAPP = '0992305463';
-export const BRAND_WHATSAPP_URL = 'https://wa.me/593992305463';
-export const BRAND_CONTACT_EMAIL = 'contacto@livi.ec';
+export const BRAND_WHATSAPP = '0959010268';
+export const BRAND_WHATSAPP_URL = 'https://wa.me/593959010268';
+export const BRAND_CONTACT_EMAIL = 'contacto@liviec.com';
 /** Sitio público: respaldo para el logo cuando FRONTEND_URL no sirve. */
-export const PUBLIC_SITE_URL = 'https://livi.ec';
+export const PUBLIC_SITE_URL = 'https://liviec.com';
 /** El logo oficial vive en el `public/` del front. */
 export const BRAND_LOGO_PATH = '/logo-livi.png';
 /** CID del logo inline: viaja adjunto en cada correo (lo agrega EmailService),

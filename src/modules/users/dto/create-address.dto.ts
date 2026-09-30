@@ -48,7 +48,7 @@ export class CreateAddressDto {
   referencia?: string;
 
   @ApiProperty({
-    example: '0992305463',
+    example: '0959010268',
     description: 'Teléfono de contacto para la entrega',
   })
   @IsString()
