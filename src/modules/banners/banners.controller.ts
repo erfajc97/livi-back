@@ -25,15 +25,22 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/constants/roles.enum';
 
 /**
- * Dos artes por banner: `image` (escritorio) y `mobileImage` (vertical). Ambos
- * opcionales, así una edición que solo cambia el texto no obliga a re-subir.
+ * Dos artes por banner: `image` (escritorio, imagen **o video**) y
+ * `mobileImage` (vertical, siempre imagen — también sirve de `poster` cuando
+ * `image` es un video). Ambos opcionales, así una edición que solo cambia el
+ * texto no obliga a re-subir.
+ *
+ * El tope son 100 MB porque es el máximo que acepta Cloudinary para video
+ * (las imágenes se siguen cortando en 10 MB dentro de CloudinaryService).
  */
+const BANNER_MEDIA_MAX_BYTES = 100 * 1024 * 1024;
+
 const BANNER_IMAGE_FIELDS = FileFieldsInterceptor(
   [
     { name: 'image', maxCount: 1 },
     { name: 'mobileImage', maxCount: 1 },
   ],
-  { limits: { fileSize: 5 * 1024 * 1024 } },
+  { limits: { fileSize: BANNER_MEDIA_MAX_BYTES } },
 );
 
 interface BannerUploadedFiles {
@@ -55,8 +62,9 @@ export class BannersController {
   @ApiOperation({
     summary: 'Create banner',
     description:
-      'Create a new banner. `image` es el arte de escritorio y `mobileImage` el vertical ' +
-      'para teléfono; si falta el móvil, el front reutiliza el de escritorio.',
+      'Create a new banner. `image` es el arte de escritorio (imagen o video mp4/webm/mov) ' +
+      'y `mobileImage` el vertical para teléfono; si falta el móvil, el front reutiliza el ' +
+      'de escritorio. Cuando `image` es un video, `mobileImage` se usa como poster.',
   })
   @ApiResponse({ status: 201, description: 'Banner created successfully' })
   create(

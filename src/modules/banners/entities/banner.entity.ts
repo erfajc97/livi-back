@@ -11,6 +11,13 @@ import {
 import { Category } from '../../categories/entities/category.entity';
 import { Marca } from '../../categories/entities/marca.entity';
 
+/**
+ * Un banner puede llevar una imagen o un video (portada de la home).
+ * Se guarda como texto (no enum de Postgres) para que `DB_SYNCHRONIZE`
+ * cree la columna sin crear un tipo nuevo ni necesitar ALTER TYPE.
+ */
+export type BannerMediaType = 'image' | 'video';
+
 export enum BannerType {
   HERO = 'hero',
   CATEGORY = 'category',
@@ -38,8 +45,16 @@ export class Banner {
   @Column({ nullable: true })
   imageKey: string;
 
+  /**
+   * Qué hay en `imageUrl`: una imagen o un video. Lo rellena el backend al
+   * subir, según el mimetype; en los banners antiguos queda 'image'.
+   */
+  @Column({ type: 'varchar', length: 16, default: 'image' })
+  mediaType: BannerMediaType;
+
   // Arte vertical opcional para móvil: si está vacío, el front usa la de
-  // escritorio.
+  // escritorio. Cuando `imageUrl` es un video, esta imagen se usa como
+  // `poster`.
   @Column({ nullable: true })
   mobileImageUrl: string;
 

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
-import { Banner, BannerType } from './entities/banner.entity';
+import { Banner, BannerType, type BannerMediaType } from './entities/banner.entity';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
 import { CloudinaryService } from '../../common/services/cloudinary.service';
@@ -13,21 +13,44 @@ const BANNER_IMAGE_TYPES = [
   'image/webp',
 ];
 
+/**
+ * La portada de la home puede ser un video. Se aceptan los formatos que
+ * reproduce un navegador sin transcodificar (mp4/webm) más quicktime, que es
+ * lo que sale de un iPhone.
+ */
+const BANNER_VIDEO_TYPES = [
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+];
+
+/** Lo permitido en el campo principal (`image`): imagen o video. */
+const BANNER_MEDIA_TYPES = [...BANNER_IMAGE_TYPES, ...BANNER_VIDEO_TYPES];
+
 const EXT_TO_MIME: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
 };
 
-/** ChatGPT y algunos SO mandan image/webp como octet-stream. */
-function withImageMime(file: Express.Multer.File): Express.Multer.File {
-  if (BANNER_IMAGE_TYPES.includes(file.mimetype)) return file;
+/**
+ * ChatGPT y algunos SO mandan image/webp (o un .mp4) como octet-stream: se
+ * recupera el mimetype real desde la extensión antes de validar.
+ */
+function withNormalizedMime(file: Express.Multer.File): Express.Multer.File {
+  if (BANNER_MEDIA_TYPES.includes(file.mimetype)) return file;
   const ext = file.originalname.split('.').pop()?.toLowerCase() ?? '';
   const mime = EXT_TO_MIME[ext];
   if (mime) file.mimetype = mime;
   return file;
 }
+
+const mediaTypeOf = (file: Express.Multer.File): BannerMediaType =>
+  file.mimetype?.startsWith('video/') ? 'video' : 'image';
 
 @Injectable()
 export class BannersService {
@@ -43,17 +66,21 @@ export class BannersService {
     mobileFile?: Express.Multer.File,
   ): Promise<Banner> {
     if (file) {
+      const media = withNormalizedMime(file);
       const uploaded = await this.cloudinaryService.uploadFile(
-        withImageMime(file),
+        media,
         'banners',
-        BANNER_IMAGE_TYPES,
+        BANNER_MEDIA_TYPES,
       );
       createBannerDto.imageUrl = uploaded.url;
       createBannerDto.imageKey = uploaded.key;
+      createBannerDto.mediaType = mediaTypeOf(media);
     }
+    // El arte móvil es siempre imagen: además de la versión vertical, hace de
+    // `poster` cuando la portada es un video.
     if (mobileFile) {
       const uploaded = await this.cloudinaryService.uploadFile(
-        withImageMime(mobileFile),
+        withNormalizedMime(mobileFile),
         'banners',
         BANNER_IMAGE_TYPES,
       );
@@ -126,13 +153,15 @@ export class BannersService {
       if (banner.imageKey) {
         await this.cloudinaryService.deleteFile(banner.imageKey);
       }
+      const media = withNormalizedMime(file);
       const uploaded = await this.cloudinaryService.uploadFile(
-        withImageMime(file),
+        media,
         'banners',
-        BANNER_IMAGE_TYPES,
+        BANNER_MEDIA_TYPES,
       );
       updateBannerDto.imageUrl = uploaded.url;
       updateBannerDto.imageKey = uploaded.key;
+      updateBannerDto.mediaType = mediaTypeOf(media);
     }
 
     if (mobileFile) {
@@ -140,7 +169,7 @@ export class BannersService {
         await this.cloudinaryService.deleteFile(banner.mobileImageKey);
       }
       const uploaded = await this.cloudinaryService.uploadFile(
-        withImageMime(mobileFile),
+        withNormalizedMime(mobileFile),
         'banners',
         BANNER_IMAGE_TYPES,
       );

@@ -1,7 +1,7 @@
-import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum, IsIn } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { BannerType } from '../entities/banner.entity';
+import { BannerType, type BannerMediaType } from '../entities/banner.entity';
 
 const toBool = ({ value }: { value: unknown }) => {
   if (typeof value === 'boolean') return value;
@@ -38,6 +38,15 @@ export class CreateBannerDto {
   @IsString()
   @IsOptional()
   imageKey?: string;
+
+  // Normalmente no se manda: lo deduce el backend del mimetype del archivo.
+  @ApiPropertyOptional({
+    enum: ['image', 'video'],
+    description: 'Qué hay en imageUrl. Lo calcula el backend al subir el archivo.',
+  })
+  @IsIn(['image', 'video'])
+  @IsOptional()
+  mediaType?: BannerMediaType;
 
   @ApiPropertyOptional({ description: 'Mobile banner image URL (arte vertical)' })
   @IsString()
